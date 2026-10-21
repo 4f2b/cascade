@@ -5,6 +5,7 @@ __license__ = 'MIT'
 from .core.session import Session
 from .core.cache import Cache
 from .core.events import EventManager
+from .core.advanced_cache import AdvancedCache, LayeredCache, CacheStrategy
 from .gateway.shard import GatewayShard
 from .api.rest import RestClient
 from .api.typing import TypingIndicator
@@ -29,12 +30,19 @@ from .utils.color import Color
 from .utils.validator import is_valid_username, extract_invite_code, parse_message_link
 from .utils.markdown import MarkdownProcessor, bold, italic, underline, strikethrough, code, code_block, spoiler
 from .utils.embed import Embed
+from .utils.activity_builder import RichActivity, ActivityAssets, ActivityTimestamps, ActivityParty, ActivitySecrets, ActivityButton
 from .ext.commands import Bot, Context, command
+from .voice import VoiceState, VoiceClient, AudioSource, PCMAudio, FFmpegAudio, OpusEncoder
+from .automod import AutoModRule, AutoModAction, AutoModTriggerMetadata, AutoModTriggerType, AutoModEventType, AutoModActionType, KeywordPresetType
+from .interactions import Component, ActionRow, Button, SelectMenu, SelectOption, TextInput, ButtonStyle, ComponentType, TextInputStyle, Modal, Interaction, InteractionType, InteractionResponseType
 
 __all__ = (
     'Session',
     'Cache',
     'EventManager',
+    'AdvancedCache',
+    'LayeredCache',
+    'CacheStrategy',
     'GatewayShard',
     'RestClient',
     'TypingIndicator',
@@ -78,7 +86,39 @@ __all__ = (
     'code_block',
     'spoiler',
     'Embed',
+    'RichActivity',
+    'ActivityAssets',
+    'ActivityTimestamps',
+    'ActivityParty',
+    'ActivitySecrets',
+    'ActivityButton',
     'Bot',
     'Context',
     'command',
+    'VoiceState',
+    'VoiceClient',
+    'AudioSource',
+    'PCMAudio',
+    'FFmpegAudio',
+    'OpusEncoder',
+    'AutoModRule',
+    'AutoModAction',
+    'AutoModTriggerMetadata',
+    'AutoModTriggerType',
+    'AutoModEventType',
+    'AutoModActionType',
+    'KeywordPresetType',
+    'Component',
+    'ActionRow',
+    'Button',
+    'SelectMenu',
+    'SelectOption',
+    'TextInput',
+    'ButtonStyle',
+    'ComponentType',
+    'TextInputStyle',
+    'Modal',
+    'Interaction',
+    'InteractionType',
+    'InteractionResponseType',
 )

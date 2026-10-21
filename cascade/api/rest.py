@@ -772,3 +772,48 @@ class RestClient:
     
     async def refresh_connection(self, platform: str, connection_id: str) -> None:
         await self.post(f'{BASE}/users/@me/connections/{platform}/{connection_id}/refresh')
+
+    async def get_automod_rules(self, guild_id: int) -> List[Dict[str, Any]]:
+        return await self.get(f'{BASE}/guilds/{guild_id}/auto-moderation/rules')
+    
+    async def get_automod_rule(self, guild_id: int, rule_id: int) -> Dict[str, Any]:
+        return await self.get(f'{BASE}/guilds/{guild_id}/auto-moderation/rules/{rule_id}')
+    
+    async def create_automod_rule(self, guild_id: int, **kwargs) -> Dict[str, Any]:
+        return await self.post(f'{BASE}/guilds/{guild_id}/auto-moderation/rules', json=kwargs)
+    
+    async def modify_automod_rule(self, guild_id: int, rule_id: int, **kwargs) -> Dict[str, Any]:
+        return await self.patch(f'{BASE}/guilds/{guild_id}/auto-moderation/rules/{rule_id}', json=kwargs)
+    
+    async def delete_automod_rule(self, guild_id: int, rule_id: int) -> None:
+        await self.delete(f'{BASE}/guilds/{guild_id}/auto-moderation/rules/{rule_id}')
+    
+    async def create_interaction_response(self, interaction_id: int, token: str, **kwargs) -> None:
+        await self.post(f'{BASE}/interactions/{interaction_id}/{token}/callback', json=kwargs)
+    
+    async def get_original_interaction_response(self, application_id: int, token: str) -> Dict[str, Any]:
+        return await self.get(f'{BASE}/webhooks/{application_id}/{token}/messages/@original')
+    
+    async def edit_original_interaction_response(self, application_id: int, token: str, **kwargs) -> Dict[str, Any]:
+        return await self.patch(f'{BASE}/webhooks/{application_id}/{token}/messages/@original', json=kwargs)
+    
+    async def delete_original_interaction_response(self, application_id: int, token: str) -> None:
+        await self.delete(f'{BASE}/webhooks/{application_id}/{token}/messages/@original')
+    
+    async def create_followup_message(self, application_id: int, token: str, **kwargs) -> Dict[str, Any]:
+        return await self.post(f'{BASE}/webhooks/{application_id}/{token}', json=kwargs)
+    
+    async def get_followup_message(self, application_id: int, token: str, message_id: int) -> Dict[str, Any]:
+        return await self.get(f'{BASE}/webhooks/{application_id}/{token}/messages/{message_id}')
+    
+    async def edit_followup_message(self, application_id: int, token: str, message_id: int, **kwargs) -> Dict[str, Any]:
+        return await self.patch(f'{BASE}/webhooks/{application_id}/{token}/messages/{message_id}', json=kwargs)
+    
+    async def delete_followup_message(self, application_id: int, token: str, message_id: int) -> None:
+        await self.delete(f'{BASE}/webhooks/{application_id}/{token}/messages/{message_id}')
+    
+    async def modify_current_user_voice_state(self, guild_id: int, **kwargs) -> None:
+        await self.patch(f'{BASE}/guilds/{guild_id}/voice-states/@me', json=kwargs)
+    
+    async def modify_user_voice_state(self, guild_id: int, user_id: int, **kwargs) -> None:
+        await self.patch(f'{BASE}/guilds/{guild_id}/voice-states/{user_id}', json=kwargs)
