@@ -197,3 +197,91 @@ class Session:
         from ..entities.application import Application
         data = await self.rest.get_application(application_id)
         return Application(data, self)
+
+    async def fetch_scheduled_events(self, guild_id: int) -> List[Any]:
+        from ..entities.scheduled_event import ScheduledEvent
+        data = await self.rest.get_guild_scheduled_events(guild_id)
+        return [ScheduledEvent(e, self) for e in data]
+
+    async def create_scheduled_event(self, guild_id: int, **kwargs) -> Any:
+        from ..entities.scheduled_event import ScheduledEvent
+        data = await self.rest.create_guild_scheduled_event(guild_id, **kwargs)
+        return ScheduledEvent(data, self)
+
+    async def fetch_stage_instance(self, channel_id: int) -> Any:
+        from ..entities.stage import StageInstance
+        data = await self.rest.get_stage_instance(channel_id)
+        return StageInstance(data, self)
+
+    async def create_stage_instance(self, channel_id: int, topic: str, privacy_level: int = 2) -> Any:
+        from ..entities.stage import StageInstance
+        data = await self.rest.create_stage_instance(channel_id, topic, privacy_level)
+        return StageInstance(data, self)
+
+    async def fetch_read_states(self) -> List[Any]:
+        from ..entities.read_state import ReadState
+        data = await self.rest.get_read_states()
+        if isinstance(data, dict):
+            data = data.get('entries', [])
+        return [ReadState(r, self) for r in data]
+
+    async def fetch_guild_stickers(self, guild_id: int) -> List[Any]:
+        from ..entities.sticker import Sticker
+        data = await self.rest.get_guild_stickers(guild_id)
+        return [Sticker(s, self) for s in data]
+
+    async def fetch_soundboard_sounds(self, guild_id: int = None) -> List[Any]:
+        from ..entities.soundboard import SoundboardSound
+        if guild_id:
+            data = await self.rest.list_guild_soundboard_sounds(guild_id)
+        else:
+            data = await self.rest.list_default_soundboard_sounds()
+        return [SoundboardSound(s, self) for s in data]
+
+    async def fetch_nitro_status(self) -> Dict[str, Any]:
+        return await self.rest.get_nitro_status()
+
+    async def fetch_subscriptions(self) -> List[Any]:
+        from ..entities.billing import Subscription
+        data = await self.rest.get_billing_subscriptions()
+        return [Subscription(s) for s in data]
+
+    async def fetch_payment_sources(self) -> List[Any]:
+        from ..entities.billing import PaymentSource
+        data = await self.rest.get_billing_payment_sources()
+        return [PaymentSource(s) for s in data]
+
+    async def fetch_applied_boosts(self) -> List[Dict[str, Any]]:
+        return await self.rest.get_applied_boosts()
+
+    async def fetch_gift_code(self, code: str) -> Any:
+        from ..entities.billing import GiftCode
+        data = await self.rest.get_gift_code(code)
+        return GiftCode(data)
+
+    async def redeem_gift_code(self, code: str) -> Dict[str, Any]:
+        return await self.rest.redeem_gift_code(code)
+
+    async def set_profile_bio(self, bio: str) -> None:
+        await self.rest.set_profile_bio(bio)
+        if self.user:
+            self.user.bio = bio
+
+    async def set_profile_pronouns(self, pronouns: str) -> None:
+        await self.rest.set_profile_pronouns(pronouns)
+        if self.user:
+            self.user.pronouns = pronouns
+
+    async def set_profile_banner(self, banner_data: Optional[str]) -> None:
+        await self.rest.set_profile_banner(banner_data)
+
+    async def set_profile_theme_colors(self, primary: int, accent: int) -> None:
+        await self.rest.set_profile_theme_colors(primary, accent)
+
+    async def fetch_invite(self, code: str) -> Any:
+        from ..entities.invite import Invite
+        data = await self.rest.get_invite(code)
+        return Invite(data, self)
+
+    async def accept_invite(self, code: str) -> Dict[str, Any]:
+        return await self.rest.accept_invite(code)

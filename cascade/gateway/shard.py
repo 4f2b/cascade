@@ -324,10 +324,73 @@ class GatewayShard:
             self.session.dispatcher.dispatch('on_user_update', data)
         
         elif event == 'RELATIONSHIP_ADD':
-            self.session.dispatcher.dispatch('on_relationship_add', data)
-        
+            from ..entities.relationship import Relationship
+            rel = Relationship(data, self.session)
+            self.session.dispatcher.dispatch('on_relationship_add', rel)
+
         elif event == 'RELATIONSHIP_REMOVE':
-            self.session.dispatcher.dispatch('on_relationship_remove', data)
+            from ..entities.relationship import Relationship
+            rel = Relationship(data, self.session)
+            self.session.dispatcher.dispatch('on_relationship_remove', rel)
+
+        elif event == 'GUILD_SCHEDULED_EVENT_CREATE':
+            from ..entities.scheduled_event import ScheduledEvent
+            event_obj = ScheduledEvent(data, self.session)
+            self.session.dispatcher.dispatch('on_scheduled_event_create', event_obj)
+
+        elif event == 'GUILD_SCHEDULED_EVENT_UPDATE':
+            from ..entities.scheduled_event import ScheduledEvent
+            event_obj = ScheduledEvent(data, self.session)
+            self.session.dispatcher.dispatch('on_scheduled_event_update', event_obj)
+
+        elif event == 'GUILD_SCHEDULED_EVENT_DELETE':
+            from ..entities.scheduled_event import ScheduledEvent
+            event_obj = ScheduledEvent(data, self.session)
+            self.session.dispatcher.dispatch('on_scheduled_event_delete', event_obj)
+
+        elif event == 'STAGE_INSTANCE_CREATE':
+            from ..entities.stage import StageInstance
+            stage = StageInstance(data, self.session)
+            self.session.dispatcher.dispatch('on_stage_create', stage)
+
+        elif event == 'STAGE_INSTANCE_UPDATE':
+            from ..entities.stage import StageInstance
+            stage = StageInstance(data, self.session)
+            self.session.dispatcher.dispatch('on_stage_update', stage)
+
+        elif event == 'STAGE_INSTANCE_DELETE':
+            from ..entities.stage import StageInstance
+            stage = StageInstance(data, self.session)
+            self.session.dispatcher.dispatch('on_stage_delete', stage)
+
+        elif event == 'GUILD_STICKERS_UPDATE':
+            guild_id = data.get('guild_id')
+            stickers = data.get('stickers', [])
+            self.session.dispatcher.dispatch('on_stickers_update', guild_id, stickers)
+
+        elif event == 'GUILD_SOUNDBOARD_SOUNDS_UPDATE':
+            guild_id = data.get('guild_id')
+            sounds = data.get('soundboard_sounds', [])
+            self.session.dispatcher.dispatch('on_soundboard_update', guild_id, sounds)
+
+        elif event == 'MESSAGE_POLL_VOTE_ADD':
+            self.session.dispatcher.dispatch('on_poll_vote_add', data)
+
+        elif event == 'MESSAGE_POLL_VOTE_REMOVE':
+            self.session.dispatcher.dispatch('on_poll_vote_remove', data)
+
+        elif event == 'VOICE_STATE_UPDATE':
+            from ..entities.voice_state_entity import VoiceStateEntity
+            state = VoiceStateEntity(data, self.session)
+            self.session.dispatcher.dispatch('on_voice_state_update', state)
+
+        elif event == 'INVITE_CREATE':
+            from ..entities.invite import Invite
+            invite = Invite(data, self.session)
+            self.session.dispatcher.dispatch('on_invite_create', invite)
+
+        elif event == 'INVITE_DELETE':
+            self.session.dispatcher.dispatch('on_invite_delete', data.get('code'), data.get('guild_id'), data.get('channel_id'))
 
     async def _handle_reconnect(self) -> None:
         if self._closed:

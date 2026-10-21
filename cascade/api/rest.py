@@ -904,3 +904,165 @@ class RestClient:
 
     async def delete_friend_suggestion(self, user_id: int) -> None:
         await self.delete(f'{BASE}/friend-suggestions/{user_id}')
+
+    async def get_guild_scheduled_events(self, guild_id: int, with_user_count: bool = True) -> List[Dict[str, Any]]:
+        return await self.get(f'{BASE}/guilds/{guild_id}/scheduled-events', params={'with_user_count': int(with_user_count)})
+
+    async def create_guild_scheduled_event(self, guild_id: int, **kwargs) -> Dict[str, Any]:
+        return await self.post(f'{BASE}/guilds/{guild_id}/scheduled-events', json=kwargs)
+
+    async def get_guild_scheduled_event(self, guild_id: int, event_id: int, with_user_count: bool = True) -> Dict[str, Any]:
+        return await self.get(f'{BASE}/guilds/{guild_id}/scheduled-events/{event_id}', params={'with_user_count': int(with_user_count)})
+
+    async def modify_guild_scheduled_event(self, guild_id: int, event_id: int, **kwargs) -> Dict[str, Any]:
+        return await self.patch(f'{BASE}/guilds/{guild_id}/scheduled-events/{event_id}', json=kwargs)
+
+    async def delete_guild_scheduled_event(self, guild_id: int, event_id: int) -> None:
+        await self.delete(f'{BASE}/guilds/{guild_id}/scheduled-events/{event_id}')
+
+    async def get_guild_scheduled_event_users(self, guild_id: int, event_id: int, limit: int = 100, with_member: bool = False) -> List[Dict[str, Any]]:
+        return await self.get(f'{BASE}/guilds/{guild_id}/scheduled-events/{event_id}/users', params={'limit': limit, 'with_member': int(with_member)})
+
+    async def get_stage_instance(self, channel_id: int) -> Dict[str, Any]:
+        return await self.get(f'{BASE}/stage-instances/{channel_id}')
+
+    async def create_stage_instance(self, channel_id: int, topic: str, privacy_level: int = 2, **kwargs) -> Dict[str, Any]:
+        return await self.post(f'{BASE}/stage-instances', json={'channel_id': str(channel_id), 'topic': topic, 'privacy_level': privacy_level, **kwargs})
+
+    async def modify_stage_instance(self, channel_id: int, **kwargs) -> Dict[str, Any]:
+        return await self.patch(f'{BASE}/stage-instances/{channel_id}', json=kwargs)
+
+    async def delete_stage_instance(self, channel_id: int) -> None:
+        await self.delete(f'{BASE}/stage-instances/{channel_id}')
+
+    async def list_default_soundboard_sounds(self) -> List[Dict[str, Any]]:
+        return await self.get(f'{BASE}/soundboard-default-sounds')
+
+    async def list_guild_soundboard_sounds(self, guild_id: int) -> List[Dict[str, Any]]:
+        data = await self.get(f'{BASE}/guilds/{guild_id}/soundboard-sounds')
+        return data.get('items', data) if isinstance(data, dict) else data
+
+    async def create_guild_soundboard_sound(self, guild_id: int, **kwargs) -> Dict[str, Any]:
+        return await self.post(f'{BASE}/guilds/{guild_id}/soundboard-sounds', json=kwargs)
+
+    async def modify_guild_soundboard_sound(self, guild_id: int, sound_id: int, **kwargs) -> Dict[str, Any]:
+        return await self.patch(f'{BASE}/guilds/{guild_id}/soundboard-sounds/{sound_id}', json=kwargs)
+
+    async def delete_guild_soundboard_sound(self, guild_id: int, sound_id: int) -> None:
+        await self.delete(f'{BASE}/guilds/{guild_id}/soundboard-sounds/{sound_id}')
+
+    async def send_soundboard_sound(self, channel_id: int, sound_id: int, source_guild_id: int = None) -> None:
+        payload: Dict[str, Any] = {'sound_id': str(sound_id)}
+        if source_guild_id:
+            payload['source_guild_id'] = str(source_guild_id)
+        await self.post(f'{BASE}/channels/{channel_id}/send-soundboard-sound', json=payload)
+
+    async def get_guild_stickers(self, guild_id: int) -> List[Dict[str, Any]]:
+        return await self.get(f'{BASE}/guilds/{guild_id}/stickers')
+
+    async def get_guild_sticker(self, guild_id: int, sticker_id: int) -> Dict[str, Any]:
+        return await self.get(f'{BASE}/guilds/{guild_id}/stickers/{sticker_id}')
+
+    async def create_guild_sticker(self, guild_id: int, name: str, description: str, tags: str, file_data: bytes, filename: str = 'sticker.png') -> Dict[str, Any]:
+        import aiohttp as _aiohttp
+        form = _aiohttp.FormData()
+        form.add_field('name', name)
+        form.add_field('description', description)
+        form.add_field('tags', tags)
+        form.add_field('file', file_data, filename=filename)
+        session = await self._get_session()
+        headers = {k: v for k, v in self._headers.items() if k != 'Content-Type'}
+        async with session.post(f'{BASE}/guilds/{guild_id}/stickers', data=form, headers=headers) as resp:
+            return await resp.json()
+
+    async def modify_guild_sticker(self, guild_id: int, sticker_id: int, **kwargs) -> Dict[str, Any]:
+        return await self.patch(f'{BASE}/guilds/{guild_id}/stickers/{sticker_id}', json=kwargs)
+
+    async def delete_guild_sticker(self, guild_id: int, sticker_id: int) -> None:
+        await self.delete(f'{BASE}/guilds/{guild_id}/stickers/{sticker_id}')
+
+    async def get_sticker(self, sticker_id: int) -> Dict[str, Any]:
+        return await self.get(f'{BASE}/stickers/{sticker_id}')
+
+    async def list_sticker_packs(self) -> List[Dict[str, Any]]:
+        data = await self.get(f'{BASE}/sticker-packs')
+        return data.get('sticker_packs', []) if isinstance(data, dict) else data
+
+    async def create_poll_answer(self, channel_id: str, message_id: str, answer_id: int) -> None:
+        await self.put(f'{BASE}/channels/{channel_id}/polls/{message_id}/answers/{answer_id}', json={})
+
+    async def delete_poll_answer(self, channel_id: str, message_id: str, answer_id: int) -> None:
+        await self.delete(f'{BASE}/channels/{channel_id}/polls/{message_id}/answers/{answer_id}')
+
+    async def get_poll_answer_voters(self, channel_id: str, message_id: str, answer_id: int, limit: int = 25) -> List[Dict[str, Any]]:
+        return await self.get(f'{BASE}/channels/{channel_id}/polls/{message_id}/answers/{answer_id}', params={'limit': limit})
+
+    async def end_poll(self, channel_id: str, message_id: str) -> Dict[str, Any]:
+        return await self.post(f'{BASE}/channels/{channel_id}/polls/{message_id}/expire', json={})
+
+    async def get_read_states(self) -> List[Dict[str, Any]]:
+        return await self.get(f'{BASE}/users/@me/read-state')
+
+    async def ack_channel(self, channel_id: int) -> None:
+        await self.post(f'{BASE}/channels/{channel_id}/messages/ack', json={'token': None})
+
+    async def ack_all_channels(self, guild_id: int) -> None:
+        await self.post(f'{BASE}/guilds/{guild_id}/ack', json={})
+
+    async def get_billing_subscriptions(self) -> List[Dict[str, Any]]:
+        return await self.get(f'{BASE}/users/@me/billing/subscriptions')
+
+    async def get_billing_payment_sources(self) -> List[Dict[str, Any]]:
+        return await self.get(f'{BASE}/users/@me/billing/payment-sources')
+
+    async def get_billing_payments(self, limit: int = 20) -> List[Dict[str, Any]]:
+        return await self.get(f'{BASE}/users/@me/billing/payments', params={'limit': limit})
+
+    async def get_applied_boosts(self) -> List[Dict[str, Any]]:
+        return await self.get(f'{BASE}/users/@me/guilds/premium/subscription-slots')
+
+    async def get_nitro_status(self) -> Dict[str, Any]:
+        return await self.get(f'{BASE}/users/@me/billing/premium-status')
+
+    async def get_gift_code(self, code: str) -> Dict[str, Any]:
+        return await self.get(f'{BASE}/entitlements/gift-codes/{code}', params={'with_application': True, 'with_subscription_plan': True})
+
+    async def redeem_gift_code(self, code: str, payment_source_id: int = None) -> Dict[str, Any]:
+        payload: Dict[str, Any] = {}
+        if payment_source_id:
+            payload['payment_source_id'] = str(payment_source_id)
+        return await self.post(f'{BASE}/entitlements/gift-codes/{code}/redeem', json=payload)
+
+    async def get_promotions(self) -> List[Dict[str, Any]]:
+        return await self.get(f'{BASE}/outbound-promotions', params={'with_unexpired_codes': True})
+
+    async def set_profile_bio(self, bio: str) -> Dict[str, Any]:
+        return await self.patch(f'{BASE}/users/@me/profile', json={'bio': bio})
+
+    async def set_profile_pronouns(self, pronouns: str) -> Dict[str, Any]:
+        return await self.patch(f'{BASE}/users/@me/profile', json={'pronouns': pronouns})
+
+    async def set_profile_banner(self, banner_data: Optional[str]) -> Dict[str, Any]:
+        return await self.patch(f'{BASE}/users/@me/profile', json={'banner': banner_data})
+
+    async def set_profile_theme_colors(self, primary: int, accent: int) -> Dict[str, Any]:
+        return await self.patch(f'{BASE}/users/@me/profile', json={'theme_colors': [primary, accent]})
+
+    async def set_profile_avatar_decoration(self, sku_id: Optional[int]) -> Dict[str, Any]:
+        payload = {'avatar_decoration_data': {'sku_id': str(sku_id)} if sku_id else None}
+        return await self.patch(f'{BASE}/users/@me', json=payload)
+
+    async def set_profile_emoji(self, guild_id: int, emoji_id: Optional[int], emoji_name: Optional[str] = None) -> Dict[str, Any]:
+        payload: Dict[str, Any] = {}
+        if emoji_id:
+            payload['profile_effect_id'] = str(emoji_id)
+        return await self.patch(f'{BASE}/users/@me/guilds/{guild_id}/settings', json=payload)
+
+    async def get_guild_member_profile(self, guild_id: int, user_id: int) -> Dict[str, Any]:
+        return await self.get(f'{BASE}/guilds/{guild_id}/members/{user_id}/profile')
+
+    async def accept_invite(self, code: str) -> Dict[str, Any]:
+        return await self.post(f'{BASE}/invites/{code}', json={'session_id': None})
+
+    async def get_invite(self, code: str, with_counts: bool = True, with_expiration: bool = True) -> Dict[str, Any]:
+        return await self.get(f'{BASE}/invites/{code}', params={'with_counts': int(with_counts), 'with_expiration': int(with_expiration)})

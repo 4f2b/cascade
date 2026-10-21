@@ -103,3 +103,56 @@ class OpCode(IntEnum):
     INVALID_SESSION = 9
     HELLO = 10
     HEARTBEAT_ACK = 11
+
+
+class StagePrivacyLevel(IntEnum):
+    PUBLIC = 1
+    GUILD_ONLY = 2
+
+
+class ScheduledEventStatus(IntEnum):
+    SCHEDULED = 1
+    ACTIVE = 2
+    COMPLETED = 3
+    CANCELED = 4
+
+
+class ScheduledEventEntityType(IntEnum):
+    STAGE_INSTANCE = 1
+    VOICE = 2
+    EXTERNAL = 3
+
+
+class StickerType(IntEnum):
+    STANDARD = 1
+    GUILD = 2
+
+
+class StickerFormatType(IntEnum):
+    PNG = 1
+    APNG = 2
+    LOTTIE = 3
+    GIF = 4
+
+
+class PremiumType(IntEnum):
+    NONE = 0
+    NITRO_CLASSIC = 1
+    NITRO = 2
+    NITRO_BASIC = 3
+
+
+class RelationshipType(IntEnum):
+    FRIEND = 1
+    BLOCKED = 2
+    INCOMING_REQUEST = 3
+    OUTGOING_REQUEST = 4
+    IMPLICIT = 5
+
+
+class InteractionType(IntEnum):
+    PING = 1
+    APPLICATION_COMMAND = 2
+    MESSAGE_COMPONENT = 3
+    APPLICATION_COMMAND_AUTOCOMPLETE = 4
+    MODAL_SUBMIT = 5
