@@ -36,3 +36,6 @@ ENV/
 *.swo
 *~
 .DS_Store
+.venv
+venv
+docs/_build/
