@@ -5,18 +5,21 @@ from ..gateway.shard import GatewayShard
 from ..api.rest import RestClient
 from .cache import Cache
 from .dispatch import EventDispatcher
+from ..spoof import PlatformSpoofer
 
 
 class Session:
-    def __init__(self, token: str, *, message_cache_limit: int = 1000):
+    def __init__(self, token: str, *, message_cache_limit: int = 1000, platform: str = "desktop"):
         self.token = token
         self.cache = Cache(message_limit=message_cache_limit)
         self.dispatcher = EventDispatcher()
-        self.rest = RestClient(token)
+        self.spoofer = PlatformSpoofer(platform)
+        self.rest = RestClient(token, spoofer=self.spoofer)
         self.gateway: Optional[GatewayShard] = None
         self.user: Optional[Any] = None
         self._closed = False
         self._ready = asyncio.Event()
+        self.platform = platform
 
     def event(self, coro: Callable) -> Callable:
         event_name = coro.__name__
@@ -137,3 +140,17 @@ class Session:
                 'self_deaf': self_deaf
             }
         })
+
+    def set_platform(self, platform: str):
+        self.platform = platform
+        self.spoofer.set_platform(platform)
+        self.rest.spoofer = self.spoofer
+        if self.gateway:
+            self.gateway.spoofer = self.spoofer
+    
+    def get_platform_info(self) -> Dict[str, str]:
+        return self.spoofer.get_platform_info()
+    
+    @staticmethod
+    def list_platforms() -> List[str]:
+        return PlatformSpoofer.list_platforms()

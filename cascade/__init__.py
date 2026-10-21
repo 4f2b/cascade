@@ -35,6 +35,7 @@ from .ext.commands import Bot, Context, command
 from .voice import VoiceState, VoiceClient, AudioSource, PCMAudio, FFmpegAudio, OpusEncoder
 from .automod import AutoModRule, AutoModAction, AutoModTriggerMetadata, AutoModTriggerType, AutoModEventType, AutoModActionType, KeywordPresetType
 from .interactions import Component, ActionRow, Button, SelectMenu, SelectOption, TextInput, ButtonStyle, ComponentType, TextInputStyle, Modal, Interaction, InteractionType, InteractionResponseType
+from .spoof import PlatformSpoofer, PLATFORM_PRESETS
 
 __all__ = (
     'Session',
@@ -121,4 +122,6 @@ __all__ = (
     'Interaction',
     'InteractionType',
     'InteractionResponseType',
+    'PlatformSpoofer',
+    'PLATFORM_PRESETS',
 )

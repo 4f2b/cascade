@@ -17,6 +17,7 @@ class GatewayShard:
     def __init__(self, token: str, session):
         self.token = token
         self.session = session
+        self.spoofer = getattr(session, 'spoofer', None)
         self.ws: Optional[Any] = None
         self.heartbeat: Optional[Heartbeat] = None
         self.sequence: Optional[int] = None
@@ -68,6 +69,9 @@ class GatewayShard:
         })
 
     def _build_client_properties(self) -> Dict:
+        if self.spoofer:
+            return self.spoofer.get_identify_properties()
+        
         return {
             'os': 'Windows',
             'browser': 'Chrome',

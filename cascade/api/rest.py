@@ -14,14 +14,18 @@ BASE = routes.BASE
 
 
 class RestClient:
-    def __init__(self, token: str):
+    def __init__(self, token: str, spoofer=None):
         self.token = token
         self.session: Optional[aiohttp.ClientSession] = None
         self.limiter = RateLimiter()
+        self.spoofer = spoofer
         self._super_properties = self._build_super_properties()
         self._headers = self._build_headers()
 
     def _build_super_properties(self) -> str:
+        if self.spoofer:
+            return self.spoofer.get_super_properties()
+        
         props = {
             'os': 'Windows',
             'browser': 'Chrome',
@@ -41,6 +45,8 @@ class RestClient:
         return base64.b64encode(json.dumps(props, separators=(',', ':')).encode()).decode()
 
     def _get_user_agent(self) -> str:
+        if self.spoofer:
+            return self.spoofer.get_user_agent()
         return 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
 
     def _build_headers(self) -> Dict[str, str]:

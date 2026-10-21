@@ -15,11 +15,12 @@ import asyncio
 import cascade
 
 async def main():
-    session = cascade.Session(token)
+    session = cascade.Session(token, platform='mobile')
     
     @session.event
     async def on_ready(user):
         print(f'Connected as {user.username}')
+        print(f'Platform: {session.get_platform_info()}')
     
     @session.event
     async def on_message(message):
@@ -76,6 +77,14 @@ bot.run(token)
 - FFmpeg audio streaming
 - YouTube-DL integration support
 - PCM audio playback
+
+### Device Spoofing
+- 17+ platform presets (desktop, mobile, VR, console)
+- Windows, macOS, Linux desktop clients
+- Android, iOS mobile devices
+- Meta Quest VR, Xbox, PlayStation
+- Automatic X-Super-Properties spoofing
+- Dynamic platform switching
 
 ### Interactions
 - Button components with multiple styles
@@ -139,6 +148,17 @@ bot.run(token)
 - Request chunking and backoff
 
 ## Advanced Usage
+
+### Device Spoofing
+```python
+session = cascade.Session(token, platform='mobile')
+
+session.set_platform('vr')
+
+platforms = cascade.Session.list_platforms()
+
+info = session.get_platform_info()
+```
 
 ### Voice Connections
 ```python
@@ -264,6 +284,7 @@ See `examples/` for complete implementations:
 - `rich_presence_example.py` - Custom rich presence activities
 - `automod_example.py` - Auto-moderation rule management
 - `advanced_cache_example.py` - Advanced caching strategies
+- `device_spoof_example.py` - Platform and device spoofing
 
 ## Warning
 
