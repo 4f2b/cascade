@@ -79,12 +79,23 @@ bot.run(token)
 - PCM audio playback
 
 ### Device Spoofing
-- 17+ platform presets (desktop, mobile, VR, console)
+- 14 platform presets (desktop, mobile, VR, console)
 - Windows, macOS, Linux desktop clients
-- Android, iOS mobile devices
-- Meta Quest VR, Xbox, PlayStation
+- Android, iOS mobile devices (iPhone, iPad)
+- Meta Quest VR
+- Xbox, PlayStation consoles
+- **Updated to latest versions**: Chrome 136, Electron 42
 - Automatic X-Super-Properties spoofing
 - Dynamic platform switching
+- No duplicate entries - streamlined platform list
+
+###  Security Features
+- **Token Protection**: Masking, hashing, format validation, user ID extraction
+- **Optional Encryption**: AES-256 encryption with PBKDF2 (requires cryptography package)
+- **Smart Rate Limiting**: Adaptive delays, bucket tracking, global limit handling
+- **Fingerprint Randomization**: Canvas noise, screen resolution, timezone, locale spoofing
+- **Human Behavior Simulation**: Realistic mouse movements, typing patterns, request timing
+- **Constant-time Comparisons**: Timing attack resistant token validation
 
 ### Interactions
 - Button components with multiple styles
@@ -158,6 +169,25 @@ session.set_platform('vr')
 platforms = cascade.Session.list_platforms()
 
 info = session.get_platform_info()
+```
+
+### Security & Protection
+```python
+from cascade import TokenManager, FingerprintRandomizer, SmartRateLimiter
+
+tm = TokenManager()
+masked = tm.mask_token(your_token)
+user_id = tm.extract_user_id(your_token)
+is_valid = tm.validate_token_format(your_token)
+
+fingerprint = FingerprintRandomizer()
+resolution = fingerprint.get_random_screen_resolution()
+typing = fingerprint.generate_typing_pattern(text_length=50)
+mouse = fingerprint.generate_mouse_movement(steps=20)
+
+limiter = SmartRateLimiter()
+await limiter.wait_if_needed('/api/channels/123/messages')
+delay = limiter.get_adaptive_delay('/api/users/@me')
 ```
 
 ### Voice Connections
@@ -285,6 +315,7 @@ See `examples/` for complete implementations:
 - `automod_example.py` - Auto-moderation rule management
 - `advanced_cache_example.py` - Advanced caching strategies
 - `device_spoof_example.py` - Platform and device spoofing
+- `security_example.py` - Token protection and fingerprinting
 
 ## Warning
 
