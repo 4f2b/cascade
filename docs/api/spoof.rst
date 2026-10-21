@@ -19,22 +19,22 @@ Available Platforms
    * - ``desktop``
      - Windows
      - Discord Client
-     - —
+     - -
      - 635180
    * - ``macos``
      - Mac OS X
      - Discord Client
-     - —
+     - -
      - 635180
    * - ``linux``
      - Linux
      - Discord Client
-     - —
+     - -
      - 635180
    * - ``web``
      - Windows
      - Chrome
-     - —
+     - -
      - 635180
    * - ``mobile``
      - Android

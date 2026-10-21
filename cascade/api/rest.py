@@ -823,3 +823,84 @@ class RestClient:
     
     async def modify_user_voice_state(self, guild_id: int, user_id: int, **kwargs) -> None:
         await self.patch(f'{BASE}/guilds/{guild_id}/voice-states/{user_id}', json=kwargs)
+
+    async def get_my_applications(self) -> List[Dict[str, Any]]:
+        return await self.get(f'{BASE}/applications')
+
+    async def get_application(self, application_id: int) -> Dict[str, Any]:
+        return await self.get(f'{BASE}/applications/{application_id}')
+
+    async def edit_application(self, application_id: int, **kwargs) -> Dict[str, Any]:
+        return await self.patch(f'{BASE}/applications/{application_id}', json=kwargs)
+
+    async def delete_application(self, application_id: int) -> None:
+        await self.delete(f'{BASE}/applications/{application_id}')
+
+    async def transfer_application(self, application_id: int, team_id: int) -> Dict[str, Any]:
+        return await self.post(f'{BASE}/applications/{application_id}/transfer', json={'team_id': str(team_id)})
+
+    async def get_application_assets(self, application_id: int) -> List[Dict[str, Any]]:
+        return await self.get(f'{BASE}/oauth2/applications/{application_id}/assets')
+
+    async def create_application_asset(self, application_id: int, name: str, image: str) -> Dict[str, Any]:
+        return await self.post(f'{BASE}/oauth2/applications/{application_id}/assets', json={'name': name, 'image': image, 'type': '1'})
+
+    async def delete_application_asset(self, application_id: int, asset_id: int) -> None:
+        await self.delete(f'{BASE}/oauth2/applications/{application_id}/assets/{asset_id}')
+
+    async def get_application_entitlements(self, application_id: int) -> List[Dict[str, Any]]:
+        return await self.get(f'{BASE}/applications/{application_id}/entitlements')
+
+    async def get_application_skus(self, application_id: int) -> List[Dict[str, Any]]:
+        return await self.get(f'{BASE}/applications/{application_id}/skus')
+
+    async def get_my_teams(self) -> List[Dict[str, Any]]:
+        return await self.get(f'{BASE}/teams')
+
+    async def create_team(self, name: str) -> Dict[str, Any]:
+        return await self.post(f'{BASE}/teams', json={'name': name})
+
+    async def get_team(self, team_id: int) -> Dict[str, Any]:
+        return await self.get(f'{BASE}/teams/{team_id}')
+
+    async def modify_team(self, team_id: int, **kwargs) -> Dict[str, Any]:
+        return await self.patch(f'{BASE}/teams/{team_id}', json=kwargs)
+
+    async def delete_team(self, team_id: int) -> None:
+        await self.delete(f'{BASE}/teams/{team_id}')
+
+    async def get_team_members(self, team_id: int) -> List[Dict[str, Any]]:
+        return await self.get(f'{BASE}/teams/{team_id}/members')
+
+    async def invite_team_member(self, team_id: int, username: str, discriminator: str = None) -> None:
+        payload = {'username': username}
+        if discriminator and discriminator != '0':
+            payload['discriminator'] = discriminator
+        await self.post(f'{BASE}/teams/{team_id}/members', json=payload)
+
+    async def remove_team_member(self, team_id: int, user_id: int) -> None:
+        await self.delete(f'{BASE}/teams/{team_id}/members/{user_id}')
+
+    async def transfer_team_ownership(self, team_id: int, user_id: int) -> None:
+        await self.patch(f'{BASE}/teams/{team_id}', json={'owner_user_id': str(user_id)})
+
+    async def get_team_applications(self, team_id: int) -> List[Dict[str, Any]]:
+        return await self.get(f'{BASE}/teams/{team_id}/applications')
+
+    async def accept_friend_request(self, user_id: int) -> None:
+        await self.put(f'{BASE}/users/@me/relationships/{user_id}', json={'type': 1})
+
+    async def remove_relationship(self, user_id: int) -> None:
+        await self.delete(f'{BASE}/users/@me/relationships/{user_id}')
+
+    async def set_relationship_nickname(self, user_id: int, nickname: Optional[str]) -> None:
+        await self.patch(f'{BASE}/users/@me/relationships/{user_id}', json={'nickname': nickname})
+
+    async def get_mutual_friends(self, user_id: int) -> List[Dict[str, Any]]:
+        return await self.get(f'{BASE}/users/{user_id}/relationships')
+
+    async def get_relationship(self, user_id: int) -> Dict[str, Any]:
+        return await self.get(f'{BASE}/users/@me/relationships/{user_id}')
+
+    async def delete_friend_suggestion(self, user_id: int) -> None:
+        await self.delete(f'{BASE}/friend-suggestions/{user_id}')

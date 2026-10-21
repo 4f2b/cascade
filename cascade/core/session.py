@@ -154,3 +154,46 @@ class Session:
     @staticmethod
     def list_platforms() -> List[str]:
         return PlatformSpoofer.list_platforms()
+
+    async def fetch_relationships(self) -> List[Any]:
+        from ..entities.relationship import Relationship
+        data = await self.rest.get_relationships()
+        return [Relationship(r, self) for r in data]
+
+    async def fetch_friends(self) -> List[Any]:
+        from ..entities.relationship import Relationship, RelationshipType
+        data = await self.rest.get_relationships()
+        return [Relationship(r, self) for r in data if r.get('type') == RelationshipType.FRIEND]
+
+    async def fetch_blocked(self) -> List[Any]:
+        from ..entities.relationship import Relationship, RelationshipType
+        data = await self.rest.get_relationships()
+        return [Relationship(r, self) for r in data if r.get('type') == RelationshipType.BLOCKED]
+
+    async def send_friend_request(self, username: str) -> None:
+        await self.rest.send_friend_request(username)
+
+    async def fetch_teams(self) -> List[Any]:
+        from ..entities.team import Team
+        data = await self.rest.get_my_teams()
+        return [Team(t, self) for t in data]
+
+    async def create_team(self, name: str) -> Any:
+        from ..entities.team import Team
+        data = await self.rest.create_team(name)
+        return Team(data, self)
+
+    async def fetch_team(self, team_id: int) -> Any:
+        from ..entities.team import Team
+        data = await self.rest.get_team(team_id)
+        return Team(data, self)
+
+    async def fetch_my_applications(self) -> List[Any]:
+        from ..entities.application import Application
+        data = await self.rest.get_my_applications()
+        return [Application(a, self) for a in data]
+
+    async def fetch_application(self, application_id: int) -> Any:
+        from ..entities.application import Application
+        data = await self.rest.get_application(application_id)
+        return Application(data, self)

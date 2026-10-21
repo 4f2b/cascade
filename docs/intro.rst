@@ -12,9 +12,9 @@ Requirements
 
 Optional dependencies:
 
-- ``PyNaCl`` — voice encryption
-- ``opuslib`` — Opus audio encoding
-- ``cryptography`` — token encryption via :class:`~cascade.security.TokenManager`
+- ``PyNaCl`` - voice encryption
+- ``opuslib`` - Opus audio encoding
+- ``cryptography`` - token encryption via :class:`~cascade.security.TokenManager`
 
 Installing
 ----------

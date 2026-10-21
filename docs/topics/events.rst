@@ -1,7 +1,20 @@
 Event Reference
 ===============
 
-Events are dispatched via the ``@session.event`` decorator or by subclassing and overriding methods.
+Register event handlers with the ``@session.event`` decorator or on a ``Bot`` instance:
+
+.. code-block:: python
+
+   @session.event
+   async def on_ready(user):
+       print(f'Connected as {user.username}')
+
+All event names must start with ``on_``.
+
+on_ready
+--------
+
+Called when the READY payload is received and the session is established.
 
 .. code-block:: python
 
@@ -9,126 +22,179 @@ Events are dispatched via the ``@session.event`` decorator or by subclassing and
    async def on_ready(user):
        ...
 
-Gateway Events
---------------
+:param user: :class:`~cascade.entities.user.ClientUser`
 
-on_ready
-~~~~~~~~
+on_resumed
+----------
 
-Called when the gateway receives the READY event.
+Called after a successful RESUME (reconnect without full re-identify).
 
-:param user: The logged-in user.
-:type user: :class:`~cascade.entities.user.ClientUser`
+.. code-block:: python
+
+   @session.event
+   async def on_resumed():
+       ...
 
 on_message
-~~~~~~~~~~
+----------
 
-Called when a message is created in any channel the user can see.
+Called when a message is created in any visible channel. Own messages are excluded.
 
-:param message: The message that was created.
-:type message: :class:`~cascade.entities.message.Message`
+.. code-block:: python
+
+   @session.event
+   async def on_message(message):
+       if message.content == '!ping':
+           await session.rest.send_message(message.channel_id, 'Pong!')
+
+:param message: :class:`~cascade.entities.message.Message`
 
 on_message_edit
-~~~~~~~~~~~~~~~
+---------------
 
-Called when a message is edited.
+Called when a visible message is edited.
 
-:param before: The message before editing.
-:param after: The message after editing.
-:type before: :class:`~cascade.entities.message.Message`
-:type after: :class:`~cascade.entities.message.Message`
+.. code-block:: python
+
+   @session.event
+   async def on_message_edit(before, after):
+       print(before.content, '->', after.content)
+
+:param before: :class:`~cascade.entities.message.Message` (cached, may be ``None``)
+:param after: :class:`~cascade.entities.message.Message`
 
 on_message_delete
-~~~~~~~~~~~~~~~~~
+-----------------
 
-Called when a message is deleted.
+Called when a visible message is deleted.
 
-:param message: The deleted message.
-:type message: :class:`~cascade.entities.message.Message`
+.. code-block:: python
+
+   @session.event
+   async def on_message_delete(message):
+       ...
+
+:param message: :class:`~cascade.entities.message.Message` (cached, may be ``None``)
 
 on_guild_join
-~~~~~~~~~~~~~
+-------------
 
-Called when the user joins a guild.
+Called when GUILD_CREATE is dispatched (initial load and actual join).
 
-:param guild: The guild that was joined.
-:type guild: :class:`~cascade.entities.guild.Guild`
+.. code-block:: python
+
+   @session.event
+   async def on_guild_join(guild):
+       print(f'In guild: {guild.name}')
+
+:param guild: :class:`~cascade.entities.guild.Guild`
 
 on_guild_remove
-~~~~~~~~~~~~~~~
+---------------
 
 Called when the user leaves or is removed from a guild.
 
-:param guild: The guild that was left.
-:type guild: :class:`~cascade.entities.guild.Guild`
+.. code-block:: python
 
-on_member_join
-~~~~~~~~~~~~~~
+   @session.event
+   async def on_guild_remove(guild):
+       ...
 
-Called when a member joins a guild.
+:param guild: :class:`~cascade.entities.guild.Guild` (cached, may be ``None``)
 
-:param member: The member that joined.
-:type member: :class:`~cascade.entities.member.Member`
+on_channel_create
+-----------------
 
-on_member_remove
-~~~~~~~~~~~~~~~~
+:param channel: :class:`~cascade.entities.channel.Channel`
 
-Called when a member leaves a guild.
+on_channel_update
+-----------------
 
-:param member: The member that left.
-:type member: :class:`~cascade.entities.member.Member`
+:param channel: :class:`~cascade.entities.channel.Channel`
 
-on_reaction_add
-~~~~~~~~~~~~~~~
+on_channel_delete
+-----------------
 
-Called when a reaction is added to a message.
-
-:param reaction: The reaction payload.
-
-on_reaction_remove
-~~~~~~~~~~~~~~~~~~
-
-Called when a reaction is removed from a message.
-
-:param reaction: The reaction payload.
-
-on_presence_update
-~~~~~~~~~~~~~~~~~~
-
-Called when a user's presence is updated.
-
-:param presence: The updated presence.
-:type presence: :class:`~cascade.entities.presence.Presence`
-
-on_voice_state_update
-~~~~~~~~~~~~~~~~~~~~~
-
-Called when a user's voice state changes.
-
-:param state: The updated voice state.
-:type state: :class:`~cascade.voice.state.VoiceState`
-
-on_interaction
-~~~~~~~~~~~~~~
-
-Called when the user receives an interaction.
-
-:param interaction: The interaction.
-:type interaction: :class:`~cascade.interactions.interaction.Interaction`
+:param channel: :class:`~cascade.entities.channel.Channel`
 
 on_typing
-~~~~~~~~~
+---------
 
-Called when a user starts typing in a channel.
+Called when a user starts typing.
 
-:param channel_id: The channel ID.
-:param user_id: The user ID.
-:param timestamp: When typing started.
+.. code-block:: python
 
-on_error
-~~~~~~~~
+   @session.event
+   async def on_typing(channel, user, timestamp):
+       ...
 
-Called when an unhandled exception occurs in an event handler.
+:param channel: Cached channel or ``None``
+:param user: Cached :class:`~cascade.entities.user.User` or ``None``
+:param timestamp: Unix timestamp integer
 
-:param event: The event name.
-:param error: The exception.
+on_presence_update
+------------------
+
+Called when any visible user's presence changes.
+
+.. code-block:: python
+
+   @session.event
+   async def on_presence_update(data):
+       print(data['user']['id'], data.get('status'))
+
+:param data: Raw presence update dict
+
+on_user_update
+--------------
+
+Called when the logged-in user's account data changes.
+
+.. code-block:: python
+
+   @session.event
+   async def on_user_update(data):
+       ...
+
+:param data: Raw user dict
+
+on_relationship_add
+-------------------
+
+Called when a relationship is added (friend request sent/received, user blocked).
+
+.. code-block:: python
+
+   @session.event
+   async def on_relationship_add(data):
+       print(data['type'], data['user']['username'])
+
+:param data: Raw relationship dict
+
+on_relationship_remove
+----------------------
+
+Called when a relationship is removed.
+
+.. code-block:: python
+
+   @session.event
+   async def on_relationship_remove(data):
+       ...
+
+:param data: Raw relationship dict
+
+wait_for
+--------
+
+Wait for a specific event that satisfies a condition:
+
+.. code-block:: python
+
+   msg = await session.wait_for(
+       'on_message',
+       check=lambda m: m.author.id == target_id and m.channel_id == channel_id,
+       timeout=60.0,
+   )
+
+Raises ``asyncio.TimeoutError`` if timeout expires without a matching event.

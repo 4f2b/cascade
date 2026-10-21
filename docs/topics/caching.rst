@@ -38,10 +38,10 @@ For custom use cases, use :class:`~cascade.core.advanced_cache.AdvancedCache` di
 Strategies
 ----------
 
-- ``LRU`` — evicts the least recently used entry
-- ``LFU`` — evicts the least frequently used entry
-- ``FIFO`` — evicts the oldest entry
-- ``TTL`` — evicts expired entries on access
+- ``LRU`` - evicts the least recently used entry
+- ``LFU`` - evicts the least frequently used entry
+- ``FIFO`` - evicts the oldest entry
+- ``TTL`` - evicts expired entries on access
 
 Layered Cache
 -------------

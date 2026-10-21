@@ -6,6 +6,14 @@ A modern, high-performance, async-ready API wrapper for Discord's user API writt
 .. warning::
    Automating user accounts is against the Discord ToS. This library is for educational purposes only. Use at your own risk.
 
+Changelogs
+----------
+
+.. toctree::
+   :maxdepth: 1
+
+   changelog
+
 Getting Started
 ---------------
 
@@ -41,8 +49,8 @@ Extensions
 
    ext/commands
 
-Manuals
--------
+Guides
+------
 
 .. toctree::
    :maxdepth: 2
@@ -51,14 +59,8 @@ Manuals
    topics/caching
    topics/presence
    topics/ratelimits
-
-Changelog
----------
-
-.. toctree::
-   :maxdepth: 1
-
-   changelog
+   topics/relationships
+   topics/applications
 
 Indices
 -------

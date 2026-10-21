@@ -13,7 +13,7 @@ A modern, high-performance, async-ready API wrapper for Discord's user API writt
 - Device and platform spoofing (desktop, mobile, VR, console)
 - Rich presence and activity builder
 - Voice connections with FFmpeg and Opus support
-- Interactions — buttons, select menus, modals
+- Interactions - buttons, select menus, modals
 - Auto-moderation rule management
 - Advanced layered caching (LRU/LFU/FIFO/TTL)
 - Token protection and fingerprint randomization

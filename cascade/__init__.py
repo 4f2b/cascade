@@ -20,7 +20,9 @@ from .entities.presence import Activity, Presence
 from .entities.webhook import Webhook
 from .entities.connection import Connection
 from .entities.settings import UserSettings
-from .entities.application import Application
+from .entities.application import Application, ApplicationFlags
+from .entities.relationship import Relationship, RelationshipType
+from .entities.team import Team, TeamMember, TeamMemberRole
 from .types.enums import ChannelType, MessageType, ActivityType, StatusType, WebhookType
 from .utils.formatting import *
 from .utils.snowflake import *
@@ -67,6 +69,12 @@ __all__ = (
     'Connection',
     'UserSettings',
     'Application',
+    'ApplicationFlags',
+    'Relationship',
+    'RelationshipType',
+    'Team',
+    'TeamMember',
+    'TeamMemberRole',
     'ChannelType',
     'MessageType',
     'ActivityType',
