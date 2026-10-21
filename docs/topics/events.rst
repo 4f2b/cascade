@@ -198,3 +198,91 @@ Wait for a specific event that satisfies a condition:
    )
 
 Raises ``asyncio.TimeoutError`` if timeout expires without a matching event.
+
+on_scheduled_event_create
+-------------------------
+
+:param event: :class:`~cascade.entities.scheduled_event.ScheduledEvent`
+
+on_scheduled_event_update
+-------------------------
+
+:param event: :class:`~cascade.entities.scheduled_event.ScheduledEvent`
+
+on_scheduled_event_delete
+-------------------------
+
+:param event: :class:`~cascade.entities.scheduled_event.ScheduledEvent`
+
+on_stage_create
+---------------
+
+:param stage: :class:`~cascade.entities.stage.StageInstance`
+
+on_stage_update
+---------------
+
+:param stage: :class:`~cascade.entities.stage.StageInstance`
+
+on_stage_delete
+---------------
+
+:param stage: :class:`~cascade.entities.stage.StageInstance`
+
+on_poll_vote_add
+----------------
+
+Called when a user votes on a poll.
+
+:param data: Raw dict with ``user_id``, ``message_id``, ``channel_id``, ``answer_id``, ``guild_id``
+
+on_poll_vote_remove
+-------------------
+
+Called when a user removes their poll vote.
+
+:param data: Raw dict with ``user_id``, ``message_id``, ``channel_id``, ``answer_id``, ``guild_id``
+
+on_voice_state_update
+---------------------
+
+Called when any user's voice state changes.
+
+.. code-block:: python
+
+   @session.event
+   async def on_voice_state_update(state):
+       if state.channel_id:
+           print(f'{state.user_id} joined channel {state.channel_id}')
+       else:
+           print(f'{state.user_id} left voice')
+
+:param state: :class:`~cascade.entities.voice_state_entity.VoiceStateEntity`
+
+on_invite_create
+----------------
+
+:param invite: :class:`~cascade.entities.invite.Invite`
+
+on_invite_delete
+----------------
+
+:param code: Invite code string
+:param guild_id: Guild ID string
+:param channel_id: Channel ID string
+
+on_stickers_update
+------------------
+
+Called when guild stickers change.
+
+:param guild_id: Guild ID string
+:param stickers: List of sticker dicts
+
+on_soundboard_update
+--------------------
+
+Called when guild soundboard sounds change.
+
+:param guild_id: Guild ID string
+:param sounds: List of sound dicts

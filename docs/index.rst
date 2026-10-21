@@ -40,6 +40,14 @@ API Reference
    api/utils
    api/security
    api/spoof
+   api/scheduled_events
+   api/stage_instances
+   api/polls
+   api/stickers
+   api/soundboard
+   api/read_states
+   api/billing
+   api/invites
 
 Extensions
 ----------
@@ -61,6 +69,8 @@ Guides
    topics/ratelimits
    topics/relationships
    topics/applications
+   topics/polls
+   topics/billing
 
 Indices
 -------
