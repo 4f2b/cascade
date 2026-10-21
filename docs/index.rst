@@ -52,6 +52,14 @@ Manuals
    topics/presence
    topics/ratelimits
 
+Changelog
+---------
+
+.. toctree::
+   :maxdepth: 1
+
+   changelog
+
 Indices
 -------
 

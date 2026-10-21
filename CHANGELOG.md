@@ -6,6 +6,19 @@ Format: `## [version] - YYYY-MM-DD`
 
 ---
 
+## [0.2.1] - 2026-10-20
+
+### Changed
+- `pyproject.toml` modernised — SPDX license string, `setuptools>=77`, optional extras (`voice`, `security`), docs/changelog URLs, examples excluded from package
+- README rewritten to be minimal — matches discord.py-self style
+- Docs switched to Furo theme with Discord-branded dark mode colours
+
+### Added
+- Changelog page in documentation
+- `Documentation` and `Changelog` links on PyPI
+
+---
+
 ## [0.2.0] - 2026-10-20
 
 ### Added

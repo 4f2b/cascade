@@ -29,16 +29,20 @@ intersphinx_mapping = {
     'aiohttp': ('https://docs.aiohttp.org/en/stable/', None),
 }
 
-html_theme = 'sphinx_rtd_theme'
+html_theme = 'furo'
 html_theme_options = {
-    'logo_only': False,
-    'navigation_depth': 4,
-    'includehidden': True,
-    'titles_only': False,
-    'collapse_navigation': False,
-    'sticky_navigation': True,
-    'prev_next_buttons_location': 'bottom',
-    'style_external_links': False,
+    'light_css_variables': {
+        'color-brand-primary': '#5865f2',
+        'color-brand-content': '#5865f2',
+        'color-admonition-background': 'rgba(88,101,242,0.07)',
+    },
+    'dark_css_variables': {
+        'color-brand-primary': '#7289da',
+        'color-brand-content': '#7289da',
+        'color-admonition-background': 'rgba(114,137,218,0.1)',
+    },
+    'sidebar_hide_name': False,
+    'navigation_with_keys': True,
 }
 
 html_title = 'cascade'
