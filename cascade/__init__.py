@@ -36,6 +36,7 @@ from .voice import VoiceState, VoiceClient, AudioSource, PCMAudio, FFmpegAudio, 
 from .automod import AutoModRule, AutoModAction, AutoModTriggerMetadata, AutoModTriggerType, AutoModEventType, AutoModActionType, KeywordPresetType
 from .interactions import Component, ActionRow, Button, SelectMenu, SelectOption, TextInput, ButtonStyle, ComponentType, TextInputStyle, Modal, Interaction, InteractionType, InteractionResponseType
 from .spoof import PlatformSpoofer, PLATFORM_PRESETS
+from .security import FingerprintRandomizer, SmartRateLimiter, TokenManager
 
 __all__ = (
     'Session',
@@ -124,4 +125,7 @@ __all__ = (
     'InteractionResponseType',
     'PlatformSpoofer',
     'PLATFORM_PRESETS',
+    'FingerprintRandomizer',
+    'SmartRateLimiter',
+    'TokenManager',
 )
