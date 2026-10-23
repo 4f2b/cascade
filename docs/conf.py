@@ -6,7 +6,7 @@ sys.path.insert(0, os.path.abspath('..'))
 project = 'cascade'
 copyright = '2026, cascade contributors'
 author = 'cascade contributors'
-release = '0.2.0'
+release = '0.3.1'
 
 extensions = [
     'sphinx.ext.autodoc',

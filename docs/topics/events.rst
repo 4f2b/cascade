@@ -79,13 +79,39 @@ Called when a visible message is deleted.
 on_guild_join
 -------------
 
-Called when GUILD_CREATE is dispatched (initial load and actual join).
+Called when ``GUILD_CREATE`` is dispatched for a guild the user actually joins.
 
 .. code-block:: python
 
    @session.event
    async def on_guild_join(guild):
-       print(f'In guild: {guild.name}')
+       print(f'Joined guild: {guild.name}')
+
+:param guild: :class:`~cascade.entities.guild.Guild`
+
+on_guild_available
+------------------
+
+Called when a previously unavailable guild (one that was in the READY payload as a stub) becomes fully available.
+
+.. code-block:: python
+
+   @session.event
+   async def on_guild_available(guild):
+       print(f'Guild available: {guild.name}')
+
+:param guild: :class:`~cascade.entities.guild.Guild`
+
+on_guild_update
+---------------
+
+Called when a guild's settings change.
+
+.. code-block:: python
+
+   @session.event
+   async def on_guild_update(guild):
+       ...
 
 :param guild: :class:`~cascade.entities.guild.Guild`
 
@@ -166,10 +192,10 @@ Called when a relationship is added (friend request sent/received, user blocked)
 .. code-block:: python
 
    @session.event
-   async def on_relationship_add(data):
-       print(data['type'], data['user']['username'])
+   async def on_relationship_add(relationship):
+       ...
 
-:param data: Raw relationship dict
+:param relationship: :class:`~cascade.entities.relationship.Relationship`
 
 on_relationship_remove
 ----------------------
@@ -179,10 +205,106 @@ Called when a relationship is removed.
 .. code-block:: python
 
    @session.event
-   async def on_relationship_remove(data):
+   async def on_relationship_remove(relationship):
        ...
 
-:param data: Raw relationship dict
+:param relationship: :class:`~cascade.entities.relationship.Relationship`
+
+on_member_join
+--------------
+
+Called when a user joins a guild.
+
+:param member: :class:`~cascade.entities.member.Member`
+
+on_member_remove
+----------------
+
+Called when a user leaves or is kicked from a guild.
+
+:param guild_id: Guild ID string
+:param user: Raw user dict
+
+on_member_update
+----------------
+
+Called when a guild member's data changes (roles, nickname, etc.).
+
+:param member: :class:`~cascade.entities.member.Member`
+
+on_role_create
+--------------
+
+:param guild_id: Guild ID string
+:param role: :class:`~cascade.entities.role.Role`
+
+on_role_update
+--------------
+
+:param guild_id: Guild ID string
+:param role: :class:`~cascade.entities.role.Role`
+
+on_role_delete
+--------------
+
+:param guild_id: Guild ID string
+:param role_id: Role ID string
+
+on_reaction_add
+---------------
+
+Called when a reaction is added to a message.
+
+:param data: Raw dict with ``user_id``, ``message_id``, ``channel_id``, ``emoji``, ``guild_id``
+
+on_reaction_remove
+------------------
+
+Called when a reaction is removed from a message.
+
+:param data: Raw dict with ``user_id``, ``message_id``, ``channel_id``, ``emoji``, ``guild_id``
+
+on_reaction_clear
+-----------------
+
+Called when all reactions are removed from a message.
+
+:param data: Raw dict with ``message_id``, ``channel_id``, ``guild_id``
+
+on_thread_create
+----------------
+
+:param thread: Thread channel object
+
+on_thread_update
+----------------
+
+:param thread: Thread channel object
+
+on_thread_delete
+----------------
+
+:param data: Raw thread delete dict
+
+on_webhooks_update
+------------------
+
+:param guild_id: Guild ID string
+:param channel_id: Channel ID string
+
+on_audit_log_entry
+------------------
+
+Called when an audit log entry is created in a guild the user can view.
+
+:param data: Raw audit log entry dict
+
+on_voice_server_update
+----------------------
+
+Called when the voice server for a guild changes. Used internally for voice connections.
+
+:param data: Raw dict with ``token``, ``guild_id``, ``endpoint``
 
 wait_for
 --------
