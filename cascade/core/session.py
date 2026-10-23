@@ -29,9 +29,14 @@ class Session:
         return coro
 
     async def start(self) -> None:
+        self._ready = asyncio.Event()
         self.gateway = GatewayShard(self.token, self)
         await self.gateway.connect()
-        await self._ready.wait()
+        try:
+            await asyncio.wait_for(self._ready.wait(), timeout=30.0)
+        except asyncio.TimeoutError:
+            await self.gateway.close()
+            raise RuntimeError('Gateway did not become ready within 30 seconds')
 
     async def close(self) -> None:
         if self._closed:
@@ -88,21 +93,14 @@ class Session:
     async def change_presence(self, status: str = None, activity=None, afk: bool = False):
         if not self.gateway:
             return
-        
-        from ..gateway import opcodes
         activities = []
         if activity:
-            activities.append(activity.to_dict())
-        
-        await self.gateway.send_json({
-            'op': opcodes.PRESENCE_UPDATE,
-            'd': {
-                'status': status or 'online',
-                'activities': activities,
-                'afk': afk,
-                'since': 0
-            }
-        })
+            activities.append(activity.to_dict() if hasattr(activity, 'to_dict') else activity)
+        await self.gateway.update_presence(
+            status=status or 'online',
+            activities=activities,
+            afk=afk
+        )
     
     async def request_guild_members(self, guild_id: int, query: str = '', limit: int = 0, presences: bool = False, user_ids: List[int] = None, nonce: str = None):
         if not self.gateway:

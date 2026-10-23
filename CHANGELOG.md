@@ -6,6 +6,29 @@ Format: `## [version] - YYYY-MM-DD`
 
 ---
 
+## [0.3.1] - 2026-10-20
+
+### Fixed
+- Gateway send queue — all outgoing messages serialized, none drop during reconnect
+- Proper WebSocket close code handling — 4004/4014 fatal and stop immediately, others resume or re-identify
+- Guild stubs from READY payload now cache correctly (`unavailable: true` no longer throws)
+- `GUILD_CREATE` after READY updates unavailable stubs and fires `on_guild_available` instead of `on_guild_join`
+- Zombie detection — 2 missed heartbeat acks triggers reconnect
+- Exponential backoff on reconnect capped at 60s, resets on successful ack
+- Heartbeat loop cancels cleanly on reconnect
+
+### Added
+- `on_guild_available` event when an unavailable guild becomes available
+- `on_guild_update` event
+- Thread events: `on_thread_create`, `on_thread_update`, `on_thread_delete`
+- Member events: `on_member_join`, `on_member_remove`, `on_member_update`
+- Role events: `on_role_create`, `on_role_update`, `on_role_delete`
+- Reaction events: `on_reaction_add`, `on_reaction_remove`, `on_reaction_clear`
+- `on_webhooks_update`, `on_audit_log_entry`, `on_voice_server_update`
+- `GatewayShard.update_presence()` method
+
+---
+
 ## [0.3.0] - 2026-10-20
 
 ### Added

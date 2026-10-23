@@ -1,14 +1,20 @@
 import asyncio
-import base64
 import json
-import platform
 import random
-import sys
 import time
 import websockets
+import websockets.exceptions
 from typing import Optional, Any, Dict
 from .heartbeat import Heartbeat
 from . import opcodes
+
+
+_NO_RESUME_CODES = {4004, 4010, 4011, 4012, 4013, 4014}
+_FATAL_CODES = {4004, 4014}
+_FATAL_MESSAGES = {
+    4004: 'Authentication failed - token is invalid',
+    4014: 'Privileged intent not granted in developer portal',
+}
 
 
 class GatewayShard:
@@ -18,120 +24,197 @@ class GatewayShard:
         self.token = token
         self.session = session
         self.spoofer = getattr(session, 'spoofer', None)
+
         self.ws: Optional[Any] = None
         self.heartbeat: Optional[Heartbeat] = None
         self.sequence: Optional[int] = None
         self.session_id: Optional[str] = None
         self.resume_url: Optional[str] = None
+
         self._closed = False
-        self._last_heartbeat_ack = time.time()
+        self._reconnecting = False
+        self._recv_task: Optional[asyncio.Task] = None
+        self._send_queue: asyncio.Queue = asyncio.Queue()
+        self._send_task: Optional[asyncio.Task] = None
         self._identify_lock = asyncio.Lock()
-        self._ready_timeout = 15.0
+        self._connect_lock = asyncio.Lock()
+        self._last_heartbeat_ack: float = time.monotonic()
+        self._reconnect_attempts: int = 0
+        self._max_reconnect_wait: float = 60.0
 
     async def connect(self, resume: bool = False) -> None:
-        url = self.resume_url if resume and self.resume_url else self.GATEWAY_URL
-        
-        extra_headers = {
-            'Accept-Encoding': 'gzip, deflate, br',
-            'Accept-Language': 'en-US,en;q=0.9',
-            'Cache-Control': 'no-cache',
-            'Pragma': 'no-cache',
-            'Sec-WebSocket-Extensions': 'permessage-deflate; client_max_window_bits',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
-        }
-        
-        self.ws = await websockets.connect(
-            url,
-            user_agent_header='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-            compression=None,
-            max_size=None,
-            max_queue=512
-        )
-        asyncio.create_task(self._receive_loop())
+        async with self._connect_lock:
+            await self._do_connect(resume=resume)
 
     async def close(self) -> None:
         if self._closed:
             return
         self._closed = True
-        if self.heartbeat:
-            await self.heartbeat.stop()
+        await self._cancel_tasks()
         if self.ws:
-            await self.ws.close()
+            try:
+                await self.ws.close()
+            except Exception:
+                pass
 
     async def send_json(self, data: Dict) -> None:
-        if self.ws:
-            await self.ws.send(json.dumps(data))
+        await self._send_queue.put(json.dumps(data))
 
     async def send_heartbeat(self) -> None:
+        await self.send_json({'op': opcodes.HEARTBEAT, 'd': self.sequence})
+
+    async def update_presence(self, status: str = 'online', activities: list = None, afk: bool = False) -> None:
         await self.send_json({
-            'op': opcodes.HEARTBEAT,
-            'd': self.sequence
+            'op': opcodes.PRESENCE_UPDATE,
+            'd': {
+                'status': status,
+                'activities': activities or [],
+                'afk': afk,
+                'since': 0,
+            }
         })
 
-    def _build_client_properties(self) -> Dict:
+    async def _do_connect(self, resume: bool = False) -> None:
+        url = self.resume_url if resume and self.resume_url else self.GATEWAY_URL
+        ua = self._get_user_agent()
+
+        self.ws = await websockets.connect(
+            url,
+            compression=None,
+            max_size=None,
+            max_queue=512,
+            open_timeout=20,
+            close_timeout=5,
+            ping_interval=None,
+            ping_timeout=None,
+            user_agent_header=ua,
+            additional_headers={
+                'Accept-Encoding': 'gzip, deflate, br',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Cache-Control': 'no-cache',
+                'Pragma': 'no-cache',
+            }
+        )
+
+        self._send_queue = asyncio.Queue()
+        self._send_task = asyncio.create_task(self._send_loop())
+        self._recv_task = asyncio.create_task(self._receive_loop())
+        self._recv_task.add_done_callback(self._on_recv_done)
+
+    async def _cancel_tasks(self) -> None:
+        for task in (self._send_task, self._recv_task):
+            if task and not task.done():
+                task.cancel()
+                try:
+                    await task
+                except (asyncio.CancelledError, Exception):
+                    pass
+        if self.heartbeat:
+            await self.heartbeat.stop()
+            self.heartbeat = None
+
+    def _on_recv_done(self, task: asyncio.Task) -> None:
+        if task.cancelled() or self._closed:
+            return
+        exc = task.exception()
+        if exc:
+            asyncio.create_task(self._handle_disconnect(exc))
+
+    def _get_user_agent(self) -> str:
         if self.spoofer:
-            return self.spoofer.get_identify_properties()
-        
-        return {
-            'os': 'Windows',
-            'browser': 'Chrome',
-            'device': '',
-            'system_locale': 'en-US',
-            'browser_user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-            'browser_version': '131.0.0.0',
-            'os_version': '10',
-            'referrer': '',
-            'referring_domain': '',
-            'referrer_current': '',
-            'referring_domain_current': '',
-            'release_channel': 'stable',
-            'client_build_number': 331288,
-            'client_event_source': None,
-        }
+            return self.spoofer.get_user_agent()
+        return (
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
+            '(KHTML, like Gecko) discord/1.0.9262 Chrome/136.0.0.0 Electron/42.0.0 Safari/537.36'
+        )
 
-    def _calculate_capabilities(self) -> int:
-        capabilities = 0
-        capabilities |= (1 << 0)
-        capabilities |= (1 << 1)
-        capabilities |= (1 << 2)
-        capabilities |= (1 << 3)
-        capabilities |= (1 << 4)
-        capabilities |= (1 << 5)
-        capabilities |= (1 << 6)
-        capabilities |= (1 << 7)
-        capabilities |= (1 << 8)
-        capabilities |= (1 << 9)
-        capabilities |= (1 << 10)
-        capabilities |= (1 << 11)
-        capabilities |= (1 << 12)
-        capabilities |= (1 << 13)
-        return capabilities
+    async def _send_loop(self) -> None:
+        while not self._closed:
+            try:
+                payload = await asyncio.wait_for(self._send_queue.get(), timeout=1.0)
+                await self.ws.send(payload)
+            except asyncio.TimeoutError:
+                continue
+            except (asyncio.CancelledError, websockets.exceptions.ConnectionClosed, Exception):
+                break
 
-    def _calculate_intents(self) -> int:
-        intents = 0
-        intents |= (1 << 0)   # GUILDS
-        intents |= (1 << 1)   # GUILD_MEMBERS  
-        intents |= (1 << 2)   # GUILD_MODERATION
-        intents |= (1 << 9)   # GUILD_MESSAGES
-        intents |= (1 << 12)  # DIRECT_MESSAGES
-        intents |= (1 << 15)  # MESSAGE_CONTENT
-        return intents
+    async def _receive_loop(self) -> None:
+        try:
+            async for raw in self.ws:
+                try:
+                    await self._handle_message(raw)
+                except asyncio.CancelledError:
+                    raise
+                except Exception:
+                    pass
+        except asyncio.CancelledError:
+            raise
+        except websockets.exceptions.ConnectionClosedOK:
+            pass
+        except websockets.exceptions.ConnectionClosedError as e:
+            if not self._closed:
+                raise RuntimeError(f'ws closed error code={e.code} reason={e.reason!r}') from e
+        except Exception:
+            if not self._closed:
+                raise
 
-    async def send_identify(self) -> None:
+    async def _handle_message(self, raw: str) -> None:
+        data = json.loads(raw)
+        op = data['op']
+        d = data.get('d')
+        s = data.get('s')
+        t = data.get('t')
+
+        if s is not None:
+            self.sequence = s
+
+        if op == opcodes.HELLO:
+            interval = d['heartbeat_interval']
+            if self.heartbeat:
+                await self.heartbeat.stop()
+            self.heartbeat = Heartbeat(self, interval)
+            await self.heartbeat.start()
+            await asyncio.sleep(interval / 1000.0 * random.random())
+            if self.session_id and self.sequence:
+                await self._send_resume()
+            else:
+                await self._send_identify()
+
+        elif op == opcodes.HEARTBEAT_ACK:
+            self._last_heartbeat_ack = time.monotonic()
+            self._reconnect_attempts = 0
+            if self.heartbeat:
+                self.heartbeat.ack()
+
+        elif op == opcodes.HEARTBEAT:
+            await self.send_heartbeat()
+
+        elif op == opcodes.RECONNECT:
+            await self._handle_reconnect()
+
+        elif op == opcodes.INVALID_SESSION:
+            resumable = bool(d)
+            if not resumable:
+                self.session_id = None
+                self.sequence = None
+            await asyncio.sleep(random.uniform(1, 5))
+            if resumable and self.session_id:
+                await self._handle_reconnect()
+            else:
+                await self._send_identify()
+
+        elif op == opcodes.DISPATCH:
+            await self._handle_dispatch(t, d)
+
+    async def _send_identify(self) -> None:
         async with self._identify_lock:
-            await asyncio.sleep(random.uniform(0.5, 2.5))
             await self.send_json({
                 'op': opcodes.IDENTIFY,
                 'd': {
                     'token': self.token,
-                    'capabilities': self._calculate_capabilities(),
+                    'capabilities': 16381,
                     'properties': self._build_client_properties(),
-                    'presence': {
-                        'status': 'online',
-                        'since': 0,
-                        'activities': [],
-                        'afk': False
-                    },
+                    'presence': {'status': 'online', 'since': 0, 'activities': [], 'afk': False},
                     'compress': False,
                     'client_state': {
                         'guild_versions': {},
@@ -140,308 +223,346 @@ class GatewayShard:
                         'user_guild_settings_version': -1,
                         'user_settings_version': -1,
                         'private_channels_version': '0',
-                        'api_code_version': 0
+                        'api_code_version': 0,
                     },
-                    'intents': self._calculate_intents()
+                    'intents': self._calculate_intents(),
                 }
             })
 
-    async def send_resume(self) -> None:
-        await asyncio.sleep(random.uniform(0.5, 1.5))
+    async def _send_resume(self) -> None:
         await self.send_json({
             'op': opcodes.RESUME,
             'd': {
                 'token': self.token,
                 'session_id': self.session_id,
-                'seq': self.sequence
+                'seq': self.sequence,
             }
         })
 
-    async def _receive_loop(self) -> None:
+    def _build_client_properties(self) -> Dict:
+        if self.spoofer:
+            return self.spoofer.get_identify_properties()
+        return {
+            'os': 'Windows',
+            'browser': 'Discord Client',
+            'device': '',
+            'system_locale': 'en-US',
+            'browser_user_agent': self._get_user_agent(),
+            'browser_version': '1.0.9262',
+            'os_version': '10.0.22631',
+            'referrer': '',
+            'referring_domain': '',
+            'referrer_current': '',
+            'referring_domain_current': '',
+            'release_channel': 'stable',
+            'client_build_number': 635180,
+            'client_event_source': None,
+            'has_client_mods': False,
+        }
+
+    def _calculate_intents(self) -> int:
+        intents = 0
+        intents |= (1 << 0)
+        intents |= (1 << 1)
+        intents |= (1 << 2)
+        intents |= (1 << 9)
+        intents |= (1 << 12)
+        intents |= (1 << 15)
+        return intents
+
+    async def _handle_reconnect(self) -> None:
+        if self._closed or self._reconnecting:
+            return
+        self._reconnecting = True
         try:
-            async for message in self.ws:
+            await self._cancel_tasks()
+            if self.ws:
                 try:
-                    await self._handle_message(message)
+                    await self.ws.close()
                 except Exception:
                     pass
-        except websockets.exceptions.ConnectionClosed as e:
-            if not self._closed:
-                if e.code == 4004:
-                    raise Exception('Authentication failed')
-                elif e.code == 4014:
-                    raise Exception('Privileged intents required')
-                await self._handle_disconnect()
-        except Exception as e:
-            if not self._closed:
-                await asyncio.sleep(random.uniform(1, 3))
-                await self._handle_disconnect()
+            await self._reconnect_loop(can_resume=bool(self.session_id and self.sequence))
+        finally:
+            self._reconnecting = False
 
-    async def _handle_message(self, message: str) -> None:
+    async def _handle_disconnect(self, exc: Exception) -> None:
+        if self._closed or self._reconnecting:
+            return
+
+        can_resume = True
+        if isinstance(exc, RuntimeError) and 'code=' in str(exc):
+            try:
+                code = int(str(exc).split('code=')[1].split(' ')[0])
+                if code in _FATAL_CODES:
+                    self._closed = True
+                    self.session._ready.set()
+                    raise RuntimeError(_FATAL_MESSAGES.get(code, f'Fatal gateway error code={code}'))
+                can_resume = code not in _NO_RESUME_CODES
+            except (IndexError, ValueError):
+                pass
+
+        self._reconnecting = True
         try:
-            data = json.loads(message)
-            op = data['op']
-            d = data.get('d')
-            s = data.get('s')
-            t = data.get('t')
+            await self._cancel_tasks()
+            if self.ws:
+                try:
+                    await self.ws.close()
+                except Exception:
+                    pass
+            if not (can_resume and self.session_id and self.sequence):
+                self.session_id = None
+                self.sequence = None
+            await self._reconnect_loop(can_resume=can_resume and bool(self.session_id))
+        finally:
+            self._reconnecting = False
 
-            if s is not None:
-                self.sequence = s
+    async def _reconnect_loop(self, can_resume: bool = True) -> None:
+        self._reconnect_attempts = 0
 
-            if op == opcodes.HELLO:
-                heartbeat_interval = d['heartbeat_interval']
-                jitter = random.random()
-                initial_delay = heartbeat_interval * jitter / 1000.0
-                await asyncio.sleep(initial_delay)
-                
-                self.heartbeat = Heartbeat(self, heartbeat_interval)
-                await self.heartbeat.start()
-                
-                if self.session_id and self.sequence:
-                    await self.send_resume()
-                else:
-                    await self.send_identify()
-            
-            elif op == opcodes.HEARTBEAT_ACK:
-                self._last_heartbeat_ack = time.time()
-                if self.heartbeat:
-                    self.heartbeat.ack()
-            
-            elif op == opcodes.HEARTBEAT:
-                await self.send_heartbeat()
-            
-            elif op == opcodes.RECONNECT:
-                await self._handle_reconnect()
-            
-            elif op == opcodes.INVALID_SESSION:
-                resumable = d if isinstance(d, bool) else False
-                if resumable and self.session_id and self.sequence:
-                    await asyncio.sleep(random.uniform(1, 5))
-                    await self._handle_reconnect()
-                else:
+        while not self._closed:
+            attempt = self._reconnect_attempts
+            if attempt > 0:
+                await asyncio.sleep(min(self._max_reconnect_wait, (2 ** min(attempt, 7)) + random.uniform(0, 1)))
+
+            try:
+                async with self._connect_lock:
+                    await self._do_connect(resume=can_resume)
+                self._reconnect_attempts = 0
+                return
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                self._reconnect_attempts += 1
+                if self._reconnect_attempts >= 3:
                     self.session_id = None
                     self.sequence = None
-                    await asyncio.sleep(random.uniform(1, 5))
-                    await self.send_identify()
-            
-            elif op == opcodes.DISPATCH:
-                await self._handle_dispatch(t, d)
+                    can_resume = False
 
+    async def _handle_zombie(self) -> None:
+        if not self._closed:
+            await self._handle_reconnect()
+
+    async def _handle_dispatch(self, event: str, data: Dict) -> None:
+        try:
+            await self._dispatch(event, data)
+        except asyncio.CancelledError:
+            raise
         except Exception:
             pass
 
-    async def _handle_dispatch(self, event: str, data: Dict) -> None:
+    async def _dispatch(self, event: str, data: Dict) -> None:
+        session = self.session
+
         if event == 'READY':
             self.session_id = data['session_id']
             self.resume_url = data.get('resume_gateway_url')
             from ..entities.user import ClientUser
-            self.session.user = ClientUser(data['user'], self.session)
-            self.session._ready.set()
-            self.session.dispatcher.dispatch('on_ready', self.session.user)
-        
+            from ..entities.guild import Guild
+            session.user = ClientUser(data['user'], session)
+            for g in data.get('guilds', []):
+                try:
+                    session.cache.add_guild(Guild(g, session))
+                except Exception:
+                    pass
+            session._ready.set()
+            session.dispatcher.dispatch('on_ready', session.user)
+
         elif event == 'RESUMED':
-            self.session._ready.set()
-            self.session.dispatcher.dispatch('on_resumed')
-        
+            session._ready.set()
+            session.dispatcher.dispatch('on_resumed')
+
         elif event == 'MESSAGE_CREATE':
             from ..entities.message import Message
-            message = Message(data, self.session)
-            self.session.cache.add_message(message)
-            
-            if message.author and message.author.id != self.session.user.id:
-                self.session.dispatcher.dispatch('on_message', message)
-        
+            msg = Message(data, session)
+            session.cache.add_message(msg)
+            if msg.author and msg.author.id != session.user.id:
+                session.dispatcher.dispatch('on_message', msg)
+
         elif event == 'MESSAGE_UPDATE':
             from ..entities.message import Message
-            old_message = self.session.cache.get_message(data['id'])
-            message = Message(data, self.session)
-            self.session.cache.add_message(message)
-            self.session.dispatcher.dispatch('on_message_edit', old_message, message)
-        
+            old = session.cache.get_message(data['id'])
+            msg = Message(data, session)
+            session.cache.add_message(msg)
+            session.dispatcher.dispatch('on_message_edit', old, msg)
+
         elif event == 'MESSAGE_DELETE':
-            message_id = data['id']
-            cached = self.session.cache.get_message(message_id)
-            self.session.cache.remove_message(message_id)
-            self.session.dispatcher.dispatch('on_message_delete', cached)
-        
+            cached = session.cache.get_message(data['id'])
+            session.cache.remove_message(data['id'])
+            session.dispatcher.dispatch('on_message_delete', cached)
+
         elif event == 'GUILD_CREATE':
             from ..entities.guild import Guild
-            guild = Guild(data, self.session)
-            self.session.cache.add_guild(guild)
-            self.session.dispatcher.dispatch('on_guild_join', guild)
-        
+            guild = Guild(data, session)
+            existing = session.cache.get_guild(guild.id)
+            session.cache.add_guild(guild)
+            if existing and getattr(existing, 'unavailable', False):
+                session.dispatcher.dispatch('on_guild_available', guild)
+            else:
+                session.dispatcher.dispatch('on_guild_join', guild)
+
+        elif event == 'GUILD_UPDATE':
+            from ..entities.guild import Guild
+            guild = Guild(data, session)
+            session.cache.add_guild(guild)
+            session.dispatcher.dispatch('on_guild_update', guild)
+
         elif event == 'GUILD_DELETE':
-            guild_id = data['id']
-            guild = self.session.cache.get_guild(guild_id)
-            self.session.cache.remove_guild(guild_id)
-            self.session.dispatcher.dispatch('on_guild_remove', guild)
-        
+            guild = session.cache.get_guild(data['id'])
+            session.cache.remove_guild(data['id'])
+            session.dispatcher.dispatch('on_guild_remove', guild)
+
         elif event == 'CHANNEL_CREATE':
             from ..entities.channel import create_channel
-            channel = create_channel(data, self.session)
-            if channel:
-                self.session.cache.add_channel(channel)
-                self.session.dispatcher.dispatch('on_channel_create', channel)
-        
+            ch = create_channel(data, session)
+            if ch:
+                session.cache.add_channel(ch)
+                session.dispatcher.dispatch('on_channel_create', ch)
+
         elif event == 'CHANNEL_UPDATE':
             from ..entities.channel import create_channel
-            channel = create_channel(data, self.session)
-            if channel:
-                self.session.cache.add_channel(channel)
-                self.session.dispatcher.dispatch('on_channel_update', channel)
-        
+            ch = create_channel(data, session)
+            if ch:
+                session.cache.add_channel(ch)
+                session.dispatcher.dispatch('on_channel_update', ch)
+
         elif event == 'CHANNEL_DELETE':
             from ..entities.channel import create_channel
-            channel = create_channel(data, self.session)
-            if channel:
-                self.session.cache.remove_channel(channel.id)
-                self.session.dispatcher.dispatch('on_channel_delete', channel)
-        
+            ch = create_channel(data, session)
+            if ch:
+                session.cache.remove_channel(ch.id)
+                session.dispatcher.dispatch('on_channel_delete', ch)
+
         elif event == 'TYPING_START':
-            channel_id = data['channel_id']
-            user_id = data['user_id']
-            timestamp = data['timestamp']
-            
-            channel = self.session.get_channel(int(channel_id))
-            user = self.session.get_user(int(user_id))
-            
-            self.session.dispatcher.dispatch('on_typing', channel, user, timestamp)
-        
+            ch = session.get_channel(int(data['channel_id']))
+            user = session.get_user(int(data['user_id']))
+            session.dispatcher.dispatch('on_typing', ch, user, data['timestamp'])
+
         elif event == 'PRESENCE_UPDATE':
-            from ..entities.user import User
             user_data = data.get('user', {})
             if user_data:
-                user_id = user_data.get('id')
-                cached_user = self.session.cache.get_user(user_id)
-                if cached_user:
-                    cached_user._update(user_data)
-            
-            self.session.dispatcher.dispatch('on_presence_update', data)
-        
+                cached = session.cache.get_user(user_data.get('id'))
+                if cached:
+                    cached._update(user_data)
+            session.dispatcher.dispatch('on_presence_update', data)
+
         elif event == 'USER_UPDATE':
-            from ..entities.user import User
-            if self.session.user and data.get('id') == self.session.user.id:
-                self.session.user._update(data)
-            self.session.dispatcher.dispatch('on_user_update', data)
-        
+            if session.user and data.get('id') == session.user.id:
+                session.user._update(data)
+            session.dispatcher.dispatch('on_user_update', data)
+
+        elif event == 'GUILD_MEMBER_ADD':
+            from ..entities.member import Member
+            session.dispatcher.dispatch('on_member_join', Member(data, session, data.get('guild_id')))
+
+        elif event == 'GUILD_MEMBER_REMOVE':
+            session.dispatcher.dispatch('on_member_remove', data.get('guild_id'), data.get('user', {}))
+
+        elif event == 'GUILD_MEMBER_UPDATE':
+            from ..entities.member import Member
+            session.dispatcher.dispatch('on_member_update', Member(data, session, data.get('guild_id')))
+
+        elif event == 'GUILD_ROLE_CREATE':
+            from ..entities.role import Role
+            session.dispatcher.dispatch('on_role_create', data.get('guild_id'), Role(data['role']))
+
+        elif event == 'GUILD_ROLE_UPDATE':
+            from ..entities.role import Role
+            session.dispatcher.dispatch('on_role_update', data.get('guild_id'), Role(data['role']))
+
+        elif event == 'GUILD_ROLE_DELETE':
+            session.dispatcher.dispatch('on_role_delete', data.get('guild_id'), data.get('role_id'))
+
+        elif event == 'MESSAGE_REACTION_ADD':
+            session.dispatcher.dispatch('on_reaction_add', data)
+
+        elif event == 'MESSAGE_REACTION_REMOVE':
+            session.dispatcher.dispatch('on_reaction_remove', data)
+
+        elif event == 'MESSAGE_REACTION_REMOVE_ALL':
+            session.dispatcher.dispatch('on_reaction_clear', data)
+
+        elif event == 'INTERACTION_CREATE':
+            from ..interactions.interaction import Interaction
+            session.dispatcher.dispatch('on_interaction', Interaction(data, session))
+
         elif event == 'RELATIONSHIP_ADD':
             from ..entities.relationship import Relationship
-            rel = Relationship(data, self.session)
-            self.session.dispatcher.dispatch('on_relationship_add', rel)
+            session.dispatcher.dispatch('on_relationship_add', Relationship(data, session))
 
         elif event == 'RELATIONSHIP_REMOVE':
             from ..entities.relationship import Relationship
-            rel = Relationship(data, self.session)
-            self.session.dispatcher.dispatch('on_relationship_remove', rel)
-
-        elif event == 'GUILD_SCHEDULED_EVENT_CREATE':
-            from ..entities.scheduled_event import ScheduledEvent
-            event_obj = ScheduledEvent(data, self.session)
-            self.session.dispatcher.dispatch('on_scheduled_event_create', event_obj)
-
-        elif event == 'GUILD_SCHEDULED_EVENT_UPDATE':
-            from ..entities.scheduled_event import ScheduledEvent
-            event_obj = ScheduledEvent(data, self.session)
-            self.session.dispatcher.dispatch('on_scheduled_event_update', event_obj)
-
-        elif event == 'GUILD_SCHEDULED_EVENT_DELETE':
-            from ..entities.scheduled_event import ScheduledEvent
-            event_obj = ScheduledEvent(data, self.session)
-            self.session.dispatcher.dispatch('on_scheduled_event_delete', event_obj)
-
-        elif event == 'STAGE_INSTANCE_CREATE':
-            from ..entities.stage import StageInstance
-            stage = StageInstance(data, self.session)
-            self.session.dispatcher.dispatch('on_stage_create', stage)
-
-        elif event == 'STAGE_INSTANCE_UPDATE':
-            from ..entities.stage import StageInstance
-            stage = StageInstance(data, self.session)
-            self.session.dispatcher.dispatch('on_stage_update', stage)
-
-        elif event == 'STAGE_INSTANCE_DELETE':
-            from ..entities.stage import StageInstance
-            stage = StageInstance(data, self.session)
-            self.session.dispatcher.dispatch('on_stage_delete', stage)
-
-        elif event == 'GUILD_STICKERS_UPDATE':
-            guild_id = data.get('guild_id')
-            stickers = data.get('stickers', [])
-            self.session.dispatcher.dispatch('on_stickers_update', guild_id, stickers)
-
-        elif event == 'GUILD_SOUNDBOARD_SOUNDS_UPDATE':
-            guild_id = data.get('guild_id')
-            sounds = data.get('soundboard_sounds', [])
-            self.session.dispatcher.dispatch('on_soundboard_update', guild_id, sounds)
-
-        elif event == 'MESSAGE_POLL_VOTE_ADD':
-            self.session.dispatcher.dispatch('on_poll_vote_add', data)
-
-        elif event == 'MESSAGE_POLL_VOTE_REMOVE':
-            self.session.dispatcher.dispatch('on_poll_vote_remove', data)
+            session.dispatcher.dispatch('on_relationship_remove', Relationship(data, session))
 
         elif event == 'VOICE_STATE_UPDATE':
             from ..entities.voice_state_entity import VoiceStateEntity
-            state = VoiceStateEntity(data, self.session)
-            self.session.dispatcher.dispatch('on_voice_state_update', state)
+            session.dispatcher.dispatch('on_voice_state_update', VoiceStateEntity(data, session))
+
+        elif event == 'VOICE_SERVER_UPDATE':
+            session.dispatcher.dispatch('on_voice_server_update', data)
+
+        elif event == 'GUILD_SCHEDULED_EVENT_CREATE':
+            from ..entities.scheduled_event import ScheduledEvent
+            session.dispatcher.dispatch('on_scheduled_event_create', ScheduledEvent(data, session))
+
+        elif event == 'GUILD_SCHEDULED_EVENT_UPDATE':
+            from ..entities.scheduled_event import ScheduledEvent
+            session.dispatcher.dispatch('on_scheduled_event_update', ScheduledEvent(data, session))
+
+        elif event == 'GUILD_SCHEDULED_EVENT_DELETE':
+            from ..entities.scheduled_event import ScheduledEvent
+            session.dispatcher.dispatch('on_scheduled_event_delete', ScheduledEvent(data, session))
+
+        elif event == 'STAGE_INSTANCE_CREATE':
+            from ..entities.stage import StageInstance
+            session.dispatcher.dispatch('on_stage_create', StageInstance(data, session))
+
+        elif event == 'STAGE_INSTANCE_UPDATE':
+            from ..entities.stage import StageInstance
+            session.dispatcher.dispatch('on_stage_update', StageInstance(data, session))
+
+        elif event == 'STAGE_INSTANCE_DELETE':
+            from ..entities.stage import StageInstance
+            session.dispatcher.dispatch('on_stage_delete', StageInstance(data, session))
 
         elif event == 'INVITE_CREATE':
             from ..entities.invite import Invite
-            invite = Invite(data, self.session)
-            self.session.dispatcher.dispatch('on_invite_create', invite)
+            session.dispatcher.dispatch('on_invite_create', Invite(data, session))
 
         elif event == 'INVITE_DELETE':
-            self.session.dispatcher.dispatch('on_invite_delete', data.get('code'), data.get('guild_id'), data.get('channel_id'))
+            session.dispatcher.dispatch('on_invite_delete', data.get('code'), data.get('guild_id'), data.get('channel_id'))
 
-    async def _handle_reconnect(self) -> None:
-        if self._closed:
-            return
-        await self.close()
-        await asyncio.sleep(random.uniform(2, 5))
-        try:
-            await self.connect(resume=True)
-            if self.session_id and self.sequence:
-                await self.send_resume()
-            else:
-                await self.send_identify()
-        except Exception:
-            await asyncio.sleep(random.uniform(3, 7))
-            await self.connect()
+        elif event == 'THREAD_CREATE':
+            from ..entities.channel import create_channel
+            thread = create_channel(data, session)
+            if thread:
+                session.cache.add_channel(thread)
+                session.dispatcher.dispatch('on_thread_create', thread)
 
-    async def _handle_disconnect(self) -> None:
-        if self._closed:
-            return
-        
-        await asyncio.sleep(random.uniform(1, 3))
-        
-        if self.session_id and self.sequence:
-            max_retries = 5
-            for attempt in range(max_retries):
-                try:
-                    await self.connect(resume=True)
-                    await self.send_resume()
-                    return
-                except Exception:
-                    if attempt < max_retries - 1:
-                        backoff = min(300, (2 ** attempt) + random.uniform(0, 1))
-                        await asyncio.sleep(backoff)
-                    else:
-                        self.session_id = None
-                        self.sequence = None
-        
-        await self.connect()
+        elif event == 'THREAD_UPDATE':
+            from ..entities.channel import create_channel
+            thread = create_channel(data, session)
+            if thread:
+                session.cache.add_channel(thread)
+                session.dispatcher.dispatch('on_thread_update', thread)
 
-    async def _handle_zombie(self) -> None:
-        if self._closed:
-            return
-        await self.close()
-        await asyncio.sleep(random.uniform(1, 3))
-        
-        if self.session_id and self.sequence:
-            try:
-                await self.connect(resume=True)
-                await self.send_resume()
-            except Exception:
-                await asyncio.sleep(random.uniform(2, 4))
-                await self.connect()
-        else:
-            await self.connect()
+        elif event == 'THREAD_DELETE':
+            session.cache.remove_channel(data.get('id', ''))
+            session.dispatcher.dispatch('on_thread_delete', data)
+
+        elif event == 'GUILD_STICKERS_UPDATE':
+            session.dispatcher.dispatch('on_stickers_update', data.get('guild_id'), data.get('stickers', []))
+
+        elif event == 'GUILD_SOUNDBOARD_SOUNDS_UPDATE':
+            session.dispatcher.dispatch('on_soundboard_update', data.get('guild_id'), data.get('soundboard_sounds', []))
+
+        elif event == 'MESSAGE_POLL_VOTE_ADD':
+            session.dispatcher.dispatch('on_poll_vote_add', data)
+
+        elif event == 'MESSAGE_POLL_VOTE_REMOVE':
+            session.dispatcher.dispatch('on_poll_vote_remove', data)
+
+        elif event == 'WEBHOOKS_UPDATE':
+            session.dispatcher.dispatch('on_webhooks_update', data.get('guild_id'), data.get('channel_id'))
+
+        elif event == 'AUDIT_LOG_ENTRY_CREATE':
+            session.dispatcher.dispatch('on_audit_log_entry', data)

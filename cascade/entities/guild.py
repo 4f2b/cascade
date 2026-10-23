@@ -13,14 +13,15 @@ class Guild:
 
     def _update(self, data: dict) -> None:
         self.id = data['id']
-        self.name = data['name']
+        self.unavailable = data.get('unavailable', False)
+        self.name = data.get('name', '')
         self.icon = data.get('icon')
         self.icon_hash = data.get('icon_hash')
         self.splash = data.get('splash')
         self.discovery_splash = data.get('discovery_splash')
         self.banner = data.get('banner')
         self.home_header = data.get('home_header')
-        self.owner_id = data['owner_id']
+        self.owner_id = data.get('owner_id', '')
         self.application_id = data.get('application_id')
         self.description = data.get('description')
         self.region = data.get('region')

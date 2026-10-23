@@ -1,5 +1,5 @@
 __title__ = 'cascade'
-__version__ = '0.3.0'
+__version__ = '0.3.1'
 __license__ = 'MIT'
 
 from .core.session import Session
