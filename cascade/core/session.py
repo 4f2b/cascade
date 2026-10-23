@@ -283,3 +283,42 @@ class Session:
 
     async def accept_invite(self, code: str) -> Dict[str, Any]:
         return await self.rest.accept_invite(code)
+
+    async def fetch_oauth2_tokens(self) -> List[Any]:
+        from ..oauth2 import OAuth2Token
+        data = await self.rest.get_oauth2_tokens()
+        return [OAuth2Token(t, self) for t in data]
+
+    async def fetch_oauth2_authorization(
+        self,
+        client_id: str,
+        scopes: List[str],
+        response_type: Optional[str] = None,
+        redirect_uri: Optional[str] = None,
+        code_challenge_method: Optional[str] = None,
+        code_challenge: Optional[str] = None,
+        state: Optional[str] = None,
+        nonce: Optional[str] = None,
+    ) -> Any:
+        from ..oauth2 import OAuth2Authorization
+        data = await self.rest.get_oauth2_authorization(
+            client_id=client_id,
+            scopes=scopes,
+            response_type=response_type,
+            redirect_uri=redirect_uri,
+            code_challenge_method=code_challenge_method,
+            code_challenge=code_challenge,
+            state=state,
+            nonce=nonce,
+        )
+        return OAuth2Authorization(
+            data,
+            self,
+            scopes=scopes,
+            response_type=response_type,
+            original_redirect_uri=redirect_uri,
+            code_challenge_method=code_challenge_method,
+            code_challenge=code_challenge,
+            state=state,
+            nonce=nonce,
+        )

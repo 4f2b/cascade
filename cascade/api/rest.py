@@ -598,13 +598,87 @@ class RestClient:
     
     async def delete_invite(self, invite_code: str) -> Dict[str, Any]:
         return await self.delete(f'{BASE}/invites/{invite_code}')
-    
+
     async def get_current_authorization_info(self) -> Dict[str, Any]:
         return await self.get(f'{BASE}/oauth2/@me')
-    
+
     async def get_current_application(self) -> Dict[str, Any]:
         return await self.get(f'{BASE}/oauth2/applications/@me')
-    
+
+    async def get_oauth2_tokens(self) -> List[Dict[str, Any]]:
+        return await self.get(f'{BASE}/oauth2/tokens')
+
+    async def revoke_oauth2_token(self, token_id: int) -> None:
+        await self.delete(f'{BASE}/oauth2/tokens/{token_id}')
+
+    async def get_oauth2_authorization(
+        self,
+        client_id: str,
+        scopes: List[str],
+        response_type: Optional[str] = None,
+        redirect_uri: Optional[str] = None,
+        code_challenge_method: Optional[str] = None,
+        code_challenge: Optional[str] = None,
+        state: Optional[str] = None,
+        nonce: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        params: Dict[str, Any] = {
+            'client_id': client_id,
+            'scope': ' '.join(scopes),
+        }
+        if response_type:
+            params['response_type'] = response_type
+        if redirect_uri:
+            params['redirect_uri'] = redirect_uri
+        if code_challenge_method:
+            params['code_challenge_method'] = code_challenge_method
+        if code_challenge:
+            params['code_challenge'] = code_challenge
+        if state:
+            params['state'] = state
+        if nonce:
+            params['nonce'] = nonce
+        return await self.get(f'{BASE}/oauth2/authorize', params=params)
+
+    async def authorize_oauth2(
+        self,
+        application_id: int,
+        scopes: List[str],
+        response_type: Optional[str] = None,
+        redirect_uri: Optional[str] = None,
+        code_challenge_method: Optional[str] = None,
+        code_challenge: Optional[str] = None,
+        state: Optional[str] = None,
+        nonce: Optional[str] = None,
+        guild_id: Optional[str] = None,
+        webhook_channel_id: Optional[str] = None,
+        permissions: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        payload: Dict[str, Any] = {
+            'authorize': True,
+            'client_id': str(application_id),
+            'scope': ' '.join(scopes),
+        }
+        if response_type:
+            payload['response_type'] = response_type
+        if redirect_uri:
+            payload['redirect_uri'] = redirect_uri
+        if code_challenge_method:
+            payload['code_challenge_method'] = code_challenge_method
+        if code_challenge:
+            payload['code_challenge'] = code_challenge
+        if state:
+            payload['state'] = state
+        if nonce:
+            payload['nonce'] = nonce
+        if guild_id:
+            payload['guild_id'] = guild_id
+        if webhook_channel_id:
+            payload['webhook_channel_id'] = webhook_channel_id
+        if permissions is not None:
+            payload['permissions'] = permissions
+        return await self.post(f'{BASE}/oauth2/authorize', json=payload)
+
     async def change_voice_state(self, guild_id: str, channel_id: str, self_mute: bool = False, self_deaf: bool = False) -> None:
         await self.gateway.send_json({
             'op': 4,
