@@ -1,7 +1,7 @@
 Event Reference
 ===============
 
-Register event handlers with the ``@session.event`` decorator or on a ``Bot`` instance:
+Register event handlers using the ``@session.event`` decorator:
 
 .. code-block:: python
 
@@ -9,103 +9,192 @@ Register event handlers with the ``@session.event`` decorator or on a ``Bot`` in
    async def on_ready(user):
        print(f'Connected as {user.username}')
 
-All event names must start with ``on_``.
+All handler names must start with ``on_``. You can also use :meth:`~cascade.core.session.Session.wait_for` to wait for a one-off event inline.
+
+.. code-block:: python
+
+   msg = await session.wait_for(
+       'on_message',
+       check=lambda m: m.channel_id == '123' and 'hello' in m.content,
+       timeout=30.0,
+   )
+
+Raises :exc:`asyncio.TimeoutError` if the timeout expires before a matching event fires.
+
+----
+
+Connection Events
+-----------------
 
 on_ready
---------
+~~~~~~~~
 
-Called when the READY payload is received and the session is established.
+Fired once when the READY payload arrives and the session is fully established. Guilds are cached and ``session.user`` is populated before this fires.
 
 .. code-block:: python
 
    @session.event
    async def on_ready(user):
-       ...
+       print(f'Logged in as {user.username}')
+       print(f'In {len(session.guilds)} guilds')
 
 :param user: :class:`~cascade.entities.user.ClientUser`
 
 on_resumed
-----------
+~~~~~~~~~~
 
-Called after a successful RESUME (reconnect without full re-identify).
+Fired after a successful RESUME — the connection was re-established without a full re-identify. The session sequence and session ID were preserved.
 
 .. code-block:: python
 
    @session.event
    async def on_resumed():
-       ...
+       print('Reconnected (resumed)')
+
+----
+
+Message Events
+--------------
 
 on_message
-----------
+~~~~~~~~~~
 
-Called when a message is created in any visible channel. Own messages are excluded.
+Fired when a message is created in any visible channel or DM. The user's own messages are excluded — use ``on_message_sent`` patterns or listen to the REST response instead.
 
 .. code-block:: python
 
    @session.event
    async def on_message(message):
-       if message.content == '!ping':
+       if message.content.startswith('!ping'):
            await session.rest.send_message(message.channel_id, 'Pong!')
 
 :param message: :class:`~cascade.entities.message.Message`
 
 on_message_edit
----------------
+~~~~~~~~~~~~~~~
 
-Called when a visible message is edited.
+Fired when a visible message is edited.
 
 .. code-block:: python
 
    @session.event
    async def on_message_edit(before, after):
-       print(before.content, '->', after.content)
+       if before:
+           print(f'Edited: {before.content!r} -> {after.content!r}')
 
-:param before: :class:`~cascade.entities.message.Message` (cached, may be ``None``)
-:param after: :class:`~cascade.entities.message.Message`
+:param before: :class:`~cascade.entities.message.Message` — cached version before the edit, may be ``None`` if not cached
+:param after: :class:`~cascade.entities.message.Message` — updated message
 
 on_message_delete
------------------
+~~~~~~~~~~~~~~~~~
 
-Called when a visible message is deleted.
+Fired when a visible message is deleted.
 
 .. code-block:: python
 
    @session.event
    async def on_message_delete(message):
+       if message:
+           print(f'Deleted: {message.content!r}')
+
+:param message: :class:`~cascade.entities.message.Message` — cached message, may be ``None`` if not cached
+
+----
+
+Reaction Events
+---------------
+
+on_reaction_add
+~~~~~~~~~~~~~~~
+
+Fired when a reaction is added to a message.
+
+.. code-block:: python
+
+   @session.event
+   async def on_reaction_add(reaction):
+       print(f'{reaction.user_id} reacted {reaction.emoji} on {reaction.message_id}')
+
+:param reaction: :class:`~cascade.entities.reaction.Reaction`
+
+on_reaction_remove
+~~~~~~~~~~~~~~~~~~
+
+Fired when a specific reaction is removed from a message.
+
+.. code-block:: python
+
+   @session.event
+   async def on_reaction_remove(reaction):
        ...
 
-:param message: :class:`~cascade.entities.message.Message` (cached, may be ``None``)
+:param reaction: :class:`~cascade.entities.reaction.Reaction`
+
+on_reaction_clear
+~~~~~~~~~~~~~~~~~
+
+Fired when all reactions are removed from a message at once.
+
+.. code-block:: python
+
+   @session.event
+   async def on_reaction_clear(message_id, channel_id, guild_id):
+       print(f'All reactions cleared on message {message_id}')
+
+:param message_id: Message ID string
+:param channel_id: Channel ID string
+:param guild_id: Guild ID string or ``None`` for DMs
+
+on_reaction_remove_emoji
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+Fired when all reactions for a specific emoji are removed from a message.
+
+.. code-block:: python
+
+   @session.event
+   async def on_reaction_remove_emoji(message_id, channel_id, emoji):
+       print(f'{emoji} reactions cleared on {message_id}')
+
+:param message_id: Message ID string
+:param channel_id: Channel ID string
+:param emoji: :class:`~cascade.entities.reaction.ReactionEmoji`
+
+----
+
+Guild Events
+------------
 
 on_guild_join
--------------
+~~~~~~~~~~~~~
 
-Called when ``GUILD_CREATE`` is dispatched for a guild the user actually joins.
+Fired when the user joins a new guild.
 
 .. code-block:: python
 
    @session.event
    async def on_guild_join(guild):
-       print(f'Joined guild: {guild.name}')
+       print(f'Joined: {guild.name}')
 
 :param guild: :class:`~cascade.entities.guild.Guild`
 
 on_guild_available
-------------------
+~~~~~~~~~~~~~~~~~~
 
-Called when a previously unavailable guild (one that was in the READY payload as a stub) becomes fully available.
+Fired when a guild that was marked unavailable in the READY payload becomes fully available. This is distinct from ``on_guild_join`` which fires for actual new joins.
 
 .. code-block:: python
 
    @session.event
    async def on_guild_available(guild):
-       print(f'Guild available: {guild.name}')
+       print(f'Available: {guild.name}')
 
 :param guild: :class:`~cascade.entities.guild.Guild`
 
 on_guild_update
----------------
+~~~~~~~~~~~~~~~
 
-Called when a guild's settings change.
+Fired when a guild's settings change (name, icon, features, etc.).
 
 .. code-block:: python
 
@@ -116,295 +205,538 @@ Called when a guild's settings change.
 :param guild: :class:`~cascade.entities.guild.Guild`
 
 on_guild_remove
----------------
+~~~~~~~~~~~~~~~
 
-Called when the user leaves or is removed from a guild.
+Fired when the user leaves, is kicked from, or is banned from a guild.
 
 .. code-block:: python
 
    @session.event
    async def on_guild_remove(guild):
-       ...
+       if guild:
+           print(f'Left: {guild.name}')
 
-:param guild: :class:`~cascade.entities.guild.Guild` (cached, may be ``None``)
+:param guild: :class:`~cascade.entities.guild.Guild` — cached guild, may be ``None``
 
-on_channel_create
------------------
+on_ban_add
+~~~~~~~~~~
 
-:param channel: :class:`~cascade.entities.channel.Channel`
-
-on_channel_update
------------------
-
-:param channel: :class:`~cascade.entities.channel.Channel`
-
-on_channel_delete
------------------
-
-:param channel: :class:`~cascade.entities.channel.Channel`
-
-on_typing
----------
-
-Called when a user starts typing.
+Fired when a user is banned from a guild.
 
 .. code-block:: python
 
    @session.event
-   async def on_typing(channel, user, timestamp):
-       ...
+   async def on_ban_add(ban):
+       print(f'{ban.username} was banned from guild {ban.guild_id}')
 
-:param channel: Cached channel or ``None``
-:param user: Cached :class:`~cascade.entities.user.User` or ``None``
-:param timestamp: Unix timestamp integer
+:param ban: :class:`~cascade.entities.ban.Ban`
 
-on_presence_update
-------------------
+on_ban_remove
+~~~~~~~~~~~~~
 
-Called when any visible user's presence changes.
+Fired when a user's ban is revoked.
 
 .. code-block:: python
 
    @session.event
-   async def on_presence_update(data):
-       print(data['user']['id'], data.get('status'))
+   async def on_ban_remove(ban):
+       print(f'{ban.username} was unbanned from guild {ban.guild_id}')
 
-:param data: Raw presence update dict
+:param ban: :class:`~cascade.entities.ban.Ban`
 
-on_user_update
---------------
+on_emojis_update
+~~~~~~~~~~~~~~~~
 
-Called when the logged-in user's account data changes.
-
-.. code-block:: python
-
-   @session.event
-   async def on_user_update(data):
-       ...
-
-:param data: Raw user dict
-
-on_relationship_add
--------------------
-
-Called when a relationship is added (friend request sent/received, user blocked).
+Fired when a guild's emoji list changes.
 
 .. code-block:: python
 
    @session.event
-   async def on_relationship_add(relationship):
-       ...
+   async def on_emojis_update(guild_id, emojis):
+       print(f'{guild_id} now has {len(emojis)} emojis')
 
-:param relationship: :class:`~cascade.entities.relationship.Relationship`
+:param guild_id: Guild ID string
+:param emojis: List of raw emoji dicts
 
-on_relationship_remove
-----------------------
+on_stickers_update
+~~~~~~~~~~~~~~~~~~
 
-Called when a relationship is removed.
+Fired when a guild's sticker list changes.
 
 .. code-block:: python
 
    @session.event
-   async def on_relationship_remove(relationship):
+   async def on_stickers_update(guild_id, stickers):
        ...
 
-:param relationship: :class:`~cascade.entities.relationship.Relationship`
+:param guild_id: Guild ID string
+:param stickers: List of raw sticker dicts
+
+on_integrations_update
+~~~~~~~~~~~~~~~~~~~~~~
+
+Fired when a guild's integrations change (bots added/removed, etc.).
+
+.. code-block:: python
+
+   @session.event
+   async def on_integrations_update(guild_id):
+       ...
+
+:param guild_id: Guild ID string
+
+----
+
+Member Events
+-------------
 
 on_member_join
---------------
+~~~~~~~~~~~~~~
 
-Called when a user joins a guild.
+Fired when a user joins a guild.
+
+.. code-block:: python
+
+   @session.event
+   async def on_member_join(member):
+       print(f'{member.user_id} joined {member.guild_id}')
 
 :param member: :class:`~cascade.entities.member.Member`
 
 on_member_remove
-----------------
+~~~~~~~~~~~~~~~~
 
-Called when a user leaves or is kicked from a guild.
+Fired when a user leaves or is removed from a guild.
+
+.. code-block:: python
+
+   @session.event
+   async def on_member_remove(guild_id, user):
+       print(f'{user.get("username")} left {guild_id}')
 
 :param guild_id: Guild ID string
 :param user: Raw user dict
 
 on_member_update
-----------------
+~~~~~~~~~~~~~~~~
 
-Called when a guild member's data changes (roles, nickname, etc.).
+Fired when a member's data changes — roles added/removed, nickname changed, timeout, etc.
+
+.. code-block:: python
+
+   @session.event
+   async def on_member_update(member):
+       ...
 
 :param member: :class:`~cascade.entities.member.Member`
 
+on_members_chunk
+~~~~~~~~~~~~~~~~
+
+Fired in response to a ``REQUEST_GUILD_MEMBERS`` gateway op. Contains a chunk of guild members.
+
+.. code-block:: python
+
+   @session.event
+   async def on_members_chunk(guild_id, members, chunk_index, chunk_count, nonce):
+       print(f'Chunk {chunk_index+1}/{chunk_count}: {len(members)} members')
+
+:param guild_id: Guild ID string
+:param members: List of raw member dicts
+:param chunk_index: Zero-based index of this chunk
+:param chunk_count: Total number of chunks
+:param nonce: Optional nonce string passed to the original request
+
+----
+
+Role Events
+-----------
+
 on_role_create
---------------
+~~~~~~~~~~~~~~
 
 :param guild_id: Guild ID string
 :param role: :class:`~cascade.entities.role.Role`
 
 on_role_update
---------------
+~~~~~~~~~~~~~~
 
 :param guild_id: Guild ID string
 :param role: :class:`~cascade.entities.role.Role`
 
 on_role_delete
---------------
+~~~~~~~~~~~~~~
 
 :param guild_id: Guild ID string
 :param role_id: Role ID string
 
-on_reaction_add
----------------
+----
 
-Called when a reaction is added to a message.
+Channel Events
+--------------
 
-:param data: Raw dict with ``user_id``, ``message_id``, ``channel_id``, ``emoji``, ``guild_id``
+on_channel_create
+~~~~~~~~~~~~~~~~~
 
-on_reaction_remove
-------------------
+Fired when a channel is created in a guild the user is in, or when a DM is opened.
 
-Called when a reaction is removed from a message.
+.. code-block:: python
 
-:param data: Raw dict with ``user_id``, ``message_id``, ``channel_id``, ``emoji``, ``guild_id``
+   @session.event
+   async def on_channel_create(channel):
+       print(f'New channel: #{channel.name}')
 
-on_reaction_clear
------------------
+:param channel: :class:`~cascade.entities.channel.Channel` subclass
 
-Called when all reactions are removed from a message.
+on_channel_update
+~~~~~~~~~~~~~~~~~
 
-:param data: Raw dict with ``message_id``, ``channel_id``, ``guild_id``
+Fired when a channel's settings change.
 
-on_thread_create
-----------------
+:param channel: :class:`~cascade.entities.channel.Channel` subclass
 
-:param thread: Thread channel object
+on_channel_delete
+~~~~~~~~~~~~~~~~~
 
-on_thread_update
-----------------
+Fired when a channel is deleted.
 
-:param thread: Thread channel object
+:param channel: :class:`~cascade.entities.channel.Channel` subclass
 
-on_thread_delete
-----------------
+on_pins_update
+~~~~~~~~~~~~~~
 
-:param data: Raw thread delete dict
+Fired when a message is pinned or unpinned in a channel.
+
+.. code-block:: python
+
+   @session.event
+   async def on_pins_update(channel_id, guild_id, last_pin_timestamp):
+       ...
+
+:param channel_id: Channel ID string
+:param guild_id: Guild ID string or ``None`` for DMs
+:param last_pin_timestamp: ISO8601 timestamp string of the most recent pin, or ``None``
+
+on_typing
+~~~~~~~~~
+
+Fired when a user starts typing in a channel.
+
+.. code-block:: python
+
+   @session.event
+   async def on_typing(channel, user, timestamp):
+       if user:
+           print(f'{user.username} is typing in #{channel.name if channel else channel_id}')
+
+:param channel: Cached :class:`~cascade.entities.channel.Channel` or ``None``
+:param user: Cached :class:`~cascade.entities.user.User` or ``None``
+:param timestamp: Unix timestamp integer
 
 on_webhooks_update
-------------------
+~~~~~~~~~~~~~~~~~~
+
+Fired when a channel's webhooks are created or deleted.
 
 :param guild_id: Guild ID string
 :param channel_id: Channel ID string
 
-on_audit_log_entry
-------------------
+----
 
-Called when an audit log entry is created in a guild the user can view.
+Thread Events
+-------------
 
-:param data: Raw audit log entry dict
+on_thread_create
+~~~~~~~~~~~~~~~~
 
-on_voice_server_update
-----------------------
-
-Called when the voice server for a guild changes. Used internally for voice connections.
-
-:param data: Raw dict with ``token``, ``guild_id``, ``endpoint``
-
-wait_for
---------
-
-Wait for a specific event that satisfies a condition:
+Fired when a thread is created.
 
 .. code-block:: python
 
-   msg = await session.wait_for(
-       'on_message',
-       check=lambda m: m.author.id == target_id and m.channel_id == channel_id,
-       timeout=60.0,
-   )
+   @session.event
+   async def on_thread_create(thread):
+       print(f'Thread created: {thread.name}')
 
-Raises ``asyncio.TimeoutError`` if timeout expires without a matching event.
+:param thread: Thread channel object
 
-on_scheduled_event_create
--------------------------
+on_thread_update
+~~~~~~~~~~~~~~~~
 
-:param event: :class:`~cascade.entities.scheduled_event.ScheduledEvent`
+Fired when a thread's settings change.
 
-on_scheduled_event_update
--------------------------
+:param thread: Thread channel object
 
-:param event: :class:`~cascade.entities.scheduled_event.ScheduledEvent`
+on_thread_delete
+~~~~~~~~~~~~~~~~
 
-on_scheduled_event_delete
--------------------------
+Fired when a thread is deleted.
 
-:param event: :class:`~cascade.entities.scheduled_event.ScheduledEvent`
+:param data: Raw dict with ``id``, ``guild_id``, ``parent_id``, ``type``
 
-on_stage_create
----------------
+on_thread_list_sync
+~~~~~~~~~~~~~~~~~~~
 
-:param stage: :class:`~cascade.entities.stage.StageInstance`
+Fired when the client gains access to a channel and receives its thread list.
 
-on_stage_update
----------------
+:param guild_id: Guild ID string
+:param channel_ids: List of channel ID strings that were synced
+:param threads: List of raw thread dicts
 
-:param stage: :class:`~cascade.entities.stage.StageInstance`
+on_thread_members_update
+~~~~~~~~~~~~~~~~~~~~~~~~
 
-on_stage_delete
----------------
+Fired when members are added to or removed from a thread.
 
-:param stage: :class:`~cascade.entities.stage.StageInstance`
+:param thread_id: Thread ID string
+:param guild_id: Guild ID string
+:param member_count: Approximate member count
+:param added_members: List of raw thread member dicts
+:param removed_member_ids: List of removed user ID strings
 
-on_poll_vote_add
-----------------
+----
 
-Called when a user votes on a poll.
-
-:param data: Raw dict with ``user_id``, ``message_id``, ``channel_id``, ``answer_id``, ``guild_id``
-
-on_poll_vote_remove
--------------------
-
-Called when a user removes their poll vote.
-
-:param data: Raw dict with ``user_id``, ``message_id``, ``channel_id``, ``answer_id``, ``guild_id``
+Voice Events
+------------
 
 on_voice_state_update
----------------------
+~~~~~~~~~~~~~~~~~~~~~
 
-Called when any user's voice state changes.
+Fired when any user's voice state changes — joining, leaving, muting, deafening, etc.
 
 .. code-block:: python
 
    @session.event
    async def on_voice_state_update(state):
        if state.channel_id:
-           print(f'{state.user_id} joined channel {state.channel_id}')
+           print(f'{state.user_id} joined voice channel {state.channel_id}')
        else:
-           print(f'{state.user_id} left voice')
+           print(f'{state.user_id} disconnected from voice')
 
 :param state: :class:`~cascade.entities.voice_state_entity.VoiceStateEntity`
 
+on_voice_server_update
+~~~~~~~~~~~~~~~~~~~~~~
+
+Fired when the voice server endpoint for a guild changes. Used internally for voice connections.
+
+:param data: Raw dict with ``token``, ``guild_id``, ``endpoint``
+
+on_soundboard_update
+~~~~~~~~~~~~~~~~~~~~
+
+Fired when a guild's soundboard sounds change.
+
+:param guild_id: Guild ID string
+:param sounds: List of raw soundboard sound dicts
+
+----
+
+Stage Events
+------------
+
+on_stage_create
+~~~~~~~~~~~~~~~
+
+Fired when a Stage instance is created.
+
+:param stage: :class:`~cascade.entities.stage.StageInstance`
+
+on_stage_update
+~~~~~~~~~~~~~~~
+
+Fired when a Stage instance is updated.
+
+:param stage: :class:`~cascade.entities.stage.StageInstance`
+
+on_stage_delete
+~~~~~~~~~~~~~~~
+
+Fired when a Stage instance ends.
+
+:param stage: :class:`~cascade.entities.stage.StageInstance`
+
+----
+
+Scheduled Event Events
+----------------------
+
+on_scheduled_event_create
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Fired when a scheduled event is created in a guild.
+
+:param event: :class:`~cascade.entities.scheduled_event.ScheduledEvent`
+
+on_scheduled_event_update
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Fired when a scheduled event is updated.
+
+:param event: :class:`~cascade.entities.scheduled_event.ScheduledEvent`
+
+on_scheduled_event_delete
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Fired when a scheduled event is cancelled or ends.
+
+:param event: :class:`~cascade.entities.scheduled_event.ScheduledEvent`
+
+----
+
+Invite Events
+-------------
+
 on_invite_create
-----------------
+~~~~~~~~~~~~~~~~
+
+Fired when an invite is created in a guild channel.
 
 :param invite: :class:`~cascade.entities.invite.Invite`
 
 on_invite_delete
-----------------
+~~~~~~~~~~~~~~~~
+
+Fired when an invite is deleted or expires.
 
 :param code: Invite code string
 :param guild_id: Guild ID string
 :param channel_id: Channel ID string
 
-on_stickers_update
+----
+
+Relationship Events
+-------------------
+
+on_relationship_add
+~~~~~~~~~~~~~~~~~~~
+
+Fired when a relationship is added — friend request sent or received, or a user is blocked.
+
+.. code-block:: python
+
+   @session.event
+   async def on_relationship_add(relationship):
+       from cascade import RelationshipType
+       if relationship.type == RelationshipType.INCOMING_REQUEST:
+           print(f'Friend request from {relationship.user_id}')
+
+:param relationship: :class:`~cascade.entities.relationship.Relationship`
+
+on_relationship_remove
+~~~~~~~~~~~~~~~~~~~~~~
+
+Fired when a relationship is removed — unfriended or unblocked.
+
+:param relationship: :class:`~cascade.entities.relationship.Relationship`
+
+----
+
+Presence / User Events
+----------------------
+
+on_presence_update
+~~~~~~~~~~~~~~~~~~
+
+Fired when any visible user's presence changes (status, activity, etc.).
+
+.. code-block:: python
+
+   @session.event
+   async def on_presence_update(presence):
+       print(presence.status, presence.activities)
+
+:param presence: :class:`~cascade.entities.presence.Presence`
+
+on_user_update
+~~~~~~~~~~~~~~
+
+Fired when the logged-in user's account data changes (username, avatar, etc.).
+
+.. code-block:: python
+
+   @session.event
+   async def on_user_update(user):
+       print(f'Account updated: {user.username}')
+
+:param user: :class:`~cascade.entities.user.ClientUser`
+
+on_sessions_replace
+~~~~~~~~~~~~~~~~~~~
+
+Fired when Discord replaces the list of active sessions (e.g. another client connects or disconnects). Selfbot-specific event.
+
+:param data: List of raw session dicts
+
+----
+
+Poll Events
+-----------
+
+on_poll_vote_add
+~~~~~~~~~~~~~~~~
+
+Fired when a user votes on a poll.
+
+.. code-block:: python
+
+   @session.event
+   async def on_poll_vote_add(user_id, message_id, channel_id, answer_id, guild_id):
+       print(f'{user_id} voted answer {answer_id} on poll {message_id}')
+
+:param user_id: Voter's user ID string
+:param message_id: Poll message ID string
+:param channel_id: Channel ID string
+:param answer_id: The answer ID that was voted on
+:param guild_id: Guild ID string or ``None``
+
+on_poll_vote_remove
+~~~~~~~~~~~~~~~~~~~
+
+Fired when a user removes their vote from a poll.
+
+:param user_id: Voter's user ID string
+:param message_id: Poll message ID string
+:param channel_id: Channel ID string
+:param answer_id: The answer ID that was unvoted
+:param guild_id: Guild ID string or ``None``
+
+----
+
+Audit Log Events
+----------------
+
+on_audit_log_entry
+~~~~~~~~~~~~~~~~~~
+
+Fired when an audit log entry is created in a guild the user has access to.
+
+.. code-block:: python
+
+   @session.event
+   async def on_audit_log_entry(entry):
+       print(f'{entry.action_name} by {entry.user_id} -> target {entry.target_id}')
+       for change in entry.changes:
+           print(f'  {change.key}: {change.before!r} -> {change.after!r}')
+
+:param entry: :class:`~cascade.entities.audit_log.AuditLogEntry`
+
+Common ``action_name`` values: ``guild_update``, ``channel_create``, ``channel_delete``, ``member_kick``, ``member_ban_add``, ``member_ban_remove``, ``member_role_update``, ``role_create``, ``role_delete``, ``invite_create``, ``webhook_create``, ``emoji_create``, ``message_delete``, ``message_bulk_delete``, ``thread_create``, ``auto_moderation_block_message``.
+
+----
+
+Interaction Events
 ------------------
 
-Called when guild stickers change.
+on_interaction
+~~~~~~~~~~~~~~
 
-:param guild_id: Guild ID string
-:param stickers: List of sticker dicts
+Fired when an interaction is created (button click, slash command, select menu, modal submit).
 
-on_soundboard_update
---------------------
+.. code-block:: python
 
-Called when guild soundboard sounds change.
+   @session.event
+   async def on_interaction(interaction):
+       if interaction.type == 2:
+           print(f'Slash command: {interaction.data.get("name")}')
 
-:param guild_id: Guild ID string
-:param sounds: List of sound dicts
+:param interaction: :class:`~cascade.interactions.interaction.Interaction`

@@ -39,3 +39,5 @@ ENV/
 .venv
 venv
 docs/_build/
+
+live_test.py
