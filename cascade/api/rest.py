@@ -57,7 +57,7 @@ class RestClient:
             'Content-Type': 'application/json',
             'Accept': '*/*',
             'Accept-Language': 'en-US,en;q=0.9',
-            'Accept-Encoding': 'gzip, deflate, br',
+            'Accept-Encoding': 'gzip, deflate',
             'Referer': 'https://discord.com/channels/@me',
             'Origin': 'https://discord.com',
             'Sec-Ch-Ua': '"Chromium";v="131", "Not_A Brand";v="24"',
@@ -345,8 +345,13 @@ class RestClient:
     async def unban_guild_member(self, guild_id: str, user_id: str) -> None:
         await self.delete(routes.guild_ban(guild_id, user_id))
     
-    async def get_guild_bans(self, guild_id: str) -> List[Dict[str, Any]]:
-        return await self.get(routes.guild_bans(guild_id))
+    async def get_guild_bans(self, guild_id: str, limit: int = 1000, before: str = None, after: str = None) -> List[Dict[str, Any]]:
+        params: Dict[str, Any] = {'limit': limit}
+        if before:
+            params['before'] = before
+        if after:
+            params['after'] = after
+        return await self.get(routes.guild_bans(guild_id), params=params)
     
     async def edit_guild(self, guild_id: str, **kwargs) -> Dict[str, Any]:
         return await self.patch(routes.guild(guild_id), json=kwargs)
@@ -1140,3 +1145,62 @@ class RestClient:
 
     async def get_invite(self, code: str, with_counts: bool = True, with_expiration: bool = True) -> Dict[str, Any]:
         return await self.get(f'{BASE}/invites/{code}', params={'with_counts': int(with_counts), 'with_expiration': int(with_expiration)})
+
+    async def get_guild_welcome_screen(self, guild_id: str) -> dict:
+        return await self.get(f'{BASE}/guilds/{guild_id}/welcome-screen')
+
+    async def edit_welcome_screen(self, guild_id: str, payload: dict) -> dict:
+        return await self.patch(f'{BASE}/guilds/{guild_id}/welcome-screen', json=payload)
+
+    async def get_guild_onboarding(self, guild_id: str) -> dict:
+        return await self.get(f'{BASE}/guilds/{guild_id}/onboarding')
+
+    async def edit_guild_onboarding(self, guild_id: str, payload: dict) -> dict:
+        return await self.put(f'{BASE}/guilds/{guild_id}/onboarding', json=payload)
+
+    async def get_guild_templates(self, guild_id: str) -> list:
+        return await self.get(f'{BASE}/guilds/{guild_id}/templates')
+
+    async def create_guild_template(self, guild_id: str, name: str, description: str = None) -> dict:
+        payload = {'name': name}
+        if description is not None:
+            payload['description'] = description
+        return await self.post(f'{BASE}/guilds/{guild_id}/templates', json=payload)
+
+    async def sync_guild_template(self, guild_id: str, code: str) -> dict:
+        return await self.put(f'{BASE}/guilds/{guild_id}/templates/{code}')
+
+    async def edit_guild_template(self, guild_id: str, code: str, **kwargs) -> dict:
+        return await self.patch(f'{BASE}/guilds/{guild_id}/templates/{code}', json=kwargs)
+
+    async def delete_guild_template(self, guild_id: str, code: str) -> dict:
+        return await self.delete(f'{BASE}/guilds/{guild_id}/templates/{code}')
+
+    async def get_template(self, code: str) -> dict:
+        return await self.get(f'{BASE}/guilds/templates/{code}')
+
+    async def create_guild_from_template(self, code: str, name: str, icon: str = None) -> dict:
+        payload = {'name': name}
+        if icon:
+            payload['icon'] = icon
+        return await self.post(f'{BASE}/guilds/templates/{code}', json=payload)
+
+    async def get_guild_ban(self, guild_id: str, user_id: str) -> dict:
+        return await self.get(f'{BASE}/guilds/{guild_id}/bans/{user_id}')
+        payload: dict = {}
+        if guild_id:
+            payload['guild_id'] = guild_id
+        if channel_id:
+            payload['channel_id'] = channel_id
+        if channel_type is not None:
+            payload['channel_type'] = channel_type
+        return await self.post(f'{BASE}/invites/{code}', json=payload)
+
+    async def get_guild_member_count(self, guild_id: str) -> dict:
+        return await self.get(f'{BASE}/guilds/{guild_id}', params={'with_counts': 'true'})
+
+    async def get_user_affinities(self) -> dict:
+        return await self.get(f'{BASE}/users/@me/affinities/users')
+
+    async def get_guild_affinities(self) -> dict:
+        return await self.get(f'{BASE}/users/@me/affinities/guilds')

@@ -10,6 +10,11 @@ from .gateway.shard import GatewayShard
 from .api.rest import RestClient
 from .api.typing import TypingIndicator
 from .oauth2 import OAuth2Token, OAuth2Authorization, OAuth2Application
+from .entities.onboarding import GuildOnboarding, OnboardingPrompt, OnboardingPromptOption, WelcomeScreen, WelcomeChannel
+from .entities.audit_log import AuditLog, AuditLogEntry, AuditLogChange
+from .entities.reaction import Reaction, ReactionEmoji
+from .entities.ban import Ban
+from .entities.template import GuildTemplate
 from .entities.message import Message
 from .entities.user import User, ClientUser
 from .entities.guild import Guild
@@ -63,6 +68,18 @@ __all__ = (
     'OAuth2Token',
     'OAuth2Authorization',
     'OAuth2Application',
+    'GuildOnboarding',
+    'OnboardingPrompt',
+    'OnboardingPromptOption',
+    'WelcomeScreen',
+    'WelcomeChannel',
+    'AuditLog',
+    'AuditLogEntry',
+    'AuditLogChange',
+    'Reaction',
+    'ReactionEmoji',
+    'Ban',
+    'GuildTemplate',
     'Message',
     'User',
     'ClientUser',

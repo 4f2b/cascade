@@ -89,7 +89,7 @@ class GatewayShard:
             ping_timeout=None,
             user_agent_header=ua,
             additional_headers={
-                'Accept-Encoding': 'gzip, deflate, br',
+                'Accept-Encoding': 'gzip, deflate',
                 'Accept-Language': 'en-US,en;q=0.9',
                 'Cache-Control': 'no-cache',
                 'Pragma': 'no-cache',
@@ -443,12 +443,14 @@ class GatewayShard:
                 cached = session.cache.get_user(user_data.get('id'))
                 if cached:
                     cached._update(user_data)
-            session.dispatcher.dispatch('on_presence_update', data)
+            from ..entities.presence import Presence
+            session.dispatcher.dispatch('on_presence_update', Presence(data))
 
         elif event == 'USER_UPDATE':
+            from ..entities.user import User
             if session.user and data.get('id') == session.user.id:
                 session.user._update(data)
-            session.dispatcher.dispatch('on_user_update', data)
+            session.dispatcher.dispatch('on_user_update', session.user or User(data, session))
 
         elif event == 'GUILD_MEMBER_ADD':
             from ..entities.member import Member
@@ -473,13 +475,19 @@ class GatewayShard:
             session.dispatcher.dispatch('on_role_delete', data.get('guild_id'), data.get('role_id'))
 
         elif event == 'MESSAGE_REACTION_ADD':
-            session.dispatcher.dispatch('on_reaction_add', data)
+            from ..entities.reaction import Reaction
+            session.dispatcher.dispatch('on_reaction_add', Reaction(data))
 
         elif event == 'MESSAGE_REACTION_REMOVE':
-            session.dispatcher.dispatch('on_reaction_remove', data)
+            from ..entities.reaction import Reaction
+            session.dispatcher.dispatch('on_reaction_remove', Reaction(data))
 
         elif event == 'MESSAGE_REACTION_REMOVE_ALL':
-            session.dispatcher.dispatch('on_reaction_clear', data)
+            session.dispatcher.dispatch('on_reaction_clear', data.get('message_id'), data.get('channel_id'), data.get('guild_id'))
+
+        elif event == 'MESSAGE_REACTION_REMOVE_EMOJI':
+            from ..entities.reaction import ReactionEmoji
+            session.dispatcher.dispatch('on_reaction_remove_emoji', data.get('message_id'), data.get('channel_id'), ReactionEmoji(data.get('emoji', {})))
 
         elif event == 'INTERACTION_CREATE':
             from ..interactions.interaction import Interaction
@@ -556,13 +564,43 @@ class GatewayShard:
             session.dispatcher.dispatch('on_soundboard_update', data.get('guild_id'), data.get('soundboard_sounds', []))
 
         elif event == 'MESSAGE_POLL_VOTE_ADD':
-            session.dispatcher.dispatch('on_poll_vote_add', data)
+            session.dispatcher.dispatch('on_poll_vote_add', data.get('user_id'), data.get('message_id'), data.get('channel_id'), data.get('answer_id'), data.get('guild_id'))
 
         elif event == 'MESSAGE_POLL_VOTE_REMOVE':
-            session.dispatcher.dispatch('on_poll_vote_remove', data)
+            session.dispatcher.dispatch('on_poll_vote_remove', data.get('user_id'), data.get('message_id'), data.get('channel_id'), data.get('answer_id'), data.get('guild_id'))
+
+        elif event == 'AUDIT_LOG_ENTRY_CREATE':
+            from ..entities.audit_log import AuditLogEntry
+            session.dispatcher.dispatch('on_audit_log_entry', AuditLogEntry(data))
+
+        elif event == 'GUILD_BAN_ADD':
+            from ..entities.ban import Ban
+            session.dispatcher.dispatch('on_ban_add', Ban(data, data.get('guild_id', '')))
+
+        elif event == 'GUILD_BAN_REMOVE':
+            from ..entities.ban import Ban
+            session.dispatcher.dispatch('on_ban_remove', Ban(data, data.get('guild_id', '')))
+
+        elif event == 'GUILD_EMOJIS_UPDATE':
+            session.dispatcher.dispatch('on_emojis_update', data.get('guild_id'), data.get('emojis', []))
+
+        elif event == 'GUILD_INTEGRATIONS_UPDATE':
+            session.dispatcher.dispatch('on_integrations_update', data.get('guild_id'))
+
+        elif event == 'CHANNEL_PINS_UPDATE':
+            session.dispatcher.dispatch('on_pins_update', data.get('channel_id'), data.get('guild_id'), data.get('last_pin_timestamp'))
+
+        elif event == 'GUILD_MEMBERS_CHUNK':
+            session.dispatcher.dispatch('on_members_chunk', data.get('guild_id'), data.get('members', []), data.get('chunk_index', 0), data.get('chunk_count', 1), data.get('nonce'))
+
+        elif event == 'THREAD_MEMBERS_UPDATE':
+            session.dispatcher.dispatch('on_thread_members_update', data.get('id'), data.get('guild_id'), data.get('member_count', 0), data.get('added_members', []), data.get('removed_member_ids', []))
+
+        elif event == 'THREAD_LIST_SYNC':
+            session.dispatcher.dispatch('on_thread_list_sync', data.get('guild_id'), data.get('channel_ids', []), data.get('threads', []))
+
+        elif event == 'SESSIONS_REPLACE':
+            session.dispatcher.dispatch('on_sessions_replace', data)
 
         elif event == 'WEBHOOKS_UPDATE':
             session.dispatcher.dispatch('on_webhooks_update', data.get('guild_id'), data.get('channel_id'))
-
-        elif event == 'AUDIT_LOG_ENTRY_CREATE':
-            session.dispatcher.dispatch('on_audit_log_entry', data)

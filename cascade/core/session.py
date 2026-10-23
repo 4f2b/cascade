@@ -322,3 +322,96 @@ class Session:
             state=state,
             nonce=nonce,
         )
+
+    async def fetch_welcome_screen(self, guild_id: int) -> Any:
+        from ..entities.onboarding import WelcomeScreen
+        data = await self.rest.get_guild_welcome_screen(str(guild_id))
+        return WelcomeScreen(data, self, str(guild_id))
+
+    async def fetch_onboarding(self, guild_id: int) -> Any:
+        from ..entities.onboarding import GuildOnboarding
+        data = await self.rest.get_guild_onboarding(str(guild_id))
+        return GuildOnboarding(data, self)
+
+    async def fetch_guild(self, guild_id: int) -> Any:
+        from ..entities.guild import Guild
+        data = await self.rest.get_guild(str(guild_id))
+        guild = Guild(data, self)
+        self.cache.add_guild(guild)
+        return guild
+
+    async def fetch_channel(self, channel_id: int) -> Any:
+        from ..entities.channel import create_channel
+        data = await self.rest.get_channel(str(channel_id))
+        ch = create_channel(data, self)
+        if ch:
+            self.cache.add_channel(ch)
+        return ch
+
+    async def fetch_user(self, user_id: int) -> Any:
+        from ..entities.user import User
+        data = await self.rest.get_user(str(user_id))
+        return User(data, self)
+
+    async def fetch_member(self, guild_id: int, user_id: int) -> Any:
+        from ..entities.member import Member
+        data = await self.rest.get_guild_member(str(guild_id), str(user_id))
+        return Member(data, self, str(guild_id))
+
+    async def fetch_ban(self, guild_id: int, user_id: int) -> Any:
+        from ..entities.ban import Ban
+        data = await self.rest.get_guild_ban(str(guild_id), str(user_id))
+        return Ban(data, str(guild_id))
+
+    async def fetch_bans(self, guild_id: int) -> List[Any]:
+        from ..entities.ban import Ban
+        data = await self.rest.get_guild_bans(str(guild_id))
+        return [Ban(b, str(guild_id)) for b in data]
+
+    async def fetch_audit_log(self, guild_id: int, **kwargs) -> Any:
+        from ..entities.audit_log import AuditLog
+        data = await self.rest.get_guild_audit_log(str(guild_id), **kwargs)
+        return AuditLog(data, str(guild_id))
+
+    async def fetch_guild_templates(self, guild_id: int) -> List[Any]:
+        from ..entities.template import GuildTemplate
+        data = await self.rest.get_guild_templates(str(guild_id))
+        return [GuildTemplate(t, self) for t in data]
+
+    async def create_guild_template(self, guild_id: int, name: str, description: str = None) -> Any:
+        from ..entities.template import GuildTemplate
+        data = await self.rest.create_guild_template(str(guild_id), name, description)
+        return GuildTemplate(data, self)
+
+    async def fetch_template(self, code: str) -> Any:
+        from ..entities.template import GuildTemplate
+        data = await self.rest.get_template(code)
+        return GuildTemplate(data, self)
+
+    async def fetch_user_profile(self, user_id: int, guild_id: int = None) -> Dict[str, Any]:
+        return await self.rest.get_user_profile(str(user_id), str(guild_id) if guild_id else None)
+
+    async def set_note(self, user_id: int, note: str) -> None:
+        await self.rest.set_user_note(str(user_id), note)
+
+    async def fetch_note(self, user_id: int) -> str:
+        data = await self.rest.get_user_notes(str(user_id))
+        return data.get('note', '') if isinstance(data, dict) else ''
+
+    async def fetch_messages(self, channel_id: int, limit: int = 50, **kwargs) -> List[Any]:
+        from ..entities.message import Message
+        data = await self.rest.get_messages(str(channel_id), limit=limit, **kwargs)
+        return [Message(m, self) for m in data]
+
+    async def fetch_message(self, channel_id: int, message_id: int) -> Any:
+        from ..entities.message import Message
+        data = await self.rest.get_message(str(channel_id), str(message_id))
+        return Message(data, self)
+
+    async def send_message(self, channel_id: int, content: str = None, **kwargs) -> Any:
+        from ..entities.message import Message
+        data = await self.rest.send_message(str(channel_id), content, **kwargs)
+        return Message(data, self)
+
+    async def ack_message(self, channel_id: int, message_id: int) -> None:
+        await self.rest.ack_message(str(channel_id), str(message_id))
