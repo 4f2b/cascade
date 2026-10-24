@@ -7,6 +7,56 @@ Changelog
 
 ----
 
+v0.4.0
+------
+
+*Unreleased*
+
+Added
+~~~~~
+
+- :class:`~cascade.entities.attachment.Attachment` entity with ``is_image``, ``is_video``, ``is_audio``, ``spoiler`` properties. Messages now parse attachments automatically.
+- :class:`~cascade.entities.forum.ForumChannel`, :class:`~cascade.entities.forum.ForumPost`, :class:`~cascade.entities.forum.ForumTag` — full forum channel support
+- :class:`~cascade.entities.note.Note` entity with ``edit()`` and ``delete()`` methods
+- :class:`~cascade.entities.integration.Integration`, :class:`~cascade.entities.integration.IntegrationAccount`, :class:`~cascade.entities.integration.IntegrationApplication`
+- :class:`~cascade.entities.guild_preview.GuildPreview`
+- :class:`~cascade.entities.voice_region.VoiceRegion`
+- :class:`~cascade.entities.search_result.MessageSearchResult` — wraps message search results
+- :class:`~cascade.utils.message_builder.MessageBuilder` — fluent message builder. Accepts embeds, components, reply, mentions, tts, flags. ``send_message()`` accepts it directly.
+- :class:`~cascade.utils.message_builder.AllowedMentions` — ``.none()``, ``.all()``, ``.to_dict()``
+- **Quests module** (``cascade.quests``): :class:`~cascade.quests.QuestClient`, :class:`~cascade.quests.Quest`, :class:`~cascade.quests.QuestConfig`, :class:`~cascade.quests.QuestUserStatus`, :class:`~cascade.quests.QuestTaskProgress`, :class:`~cascade.quests.QuestReward`, :class:`~cascade.quests.ClaimedQuest`, :class:`~cascade.quests.QuestTaskHeartbeat`
+- ``session.quests`` property — lazy ``QuestClient`` instance
+- ``QuestClient.run_heartbeat_loop()`` — safe heartbeat loop (55-65s intervals with jitter)
+- ``QuestClient.run_video_quest()`` — safe video progress loop
+- Rich methods on :class:`~cascade.entities.guild.Guild`: ``fetch_bans()``, ``fetch_ban()``, ``fetch_audit_log()``, ``fetch_templates()``, ``fetch_onboarding()``, ``fetch_welcome_screen()``, ``fetch_scheduled_events()``, ``fetch_invites()``, ``fetch_webhooks()``, ``fetch_stickers()``, ``fetch_emojis()``, ``fetch_roles()``, ``edit()``
+- Rich methods on :class:`~cascade.entities.member.Member`: ``edit()``, ``set_nickname()``, ``add_role()``, ``remove_role()``, ``kick()``, ``ban()``, ``timeout()``, ``remove_timeout()``, ``send()``, ``fetch_profile()``
+- New session methods: ``fetch_guild_preview()``, ``fetch_integrations()``, ``fetch_voice_regions()``, ``fetch_guild_voice_regions()``, ``search_messages()`` (returns ``MessageSearchResult``), ``fetch_note()``, ``set_note()``, ``fetch_pinned_messages()``, ``fetch_forum_posts()``, ``set_voice_channel_status()``
+- 30+ new REST endpoints: bulk ban, recent mentions, all notes, hypesquad, proto settings, join requests, member verification, greet, channel affinities, guild profile, recent avatars, accept/decline message requests, relationship nickname, mutual friends
+- New gateway events: ``on_ban_add``, ``on_ban_remove``, ``on_emojis_update``, ``on_integrations_update``, ``on_pins_update``, ``on_members_chunk``, ``on_thread_list_sync``, ``on_thread_members_update``, ``on_sessions_replace``, ``on_voice_channel_status``, ``on_reaction_remove_emoji``
+- Read states now cached from READY payload
+
+Changed
+~~~~~~~
+
+- Version strings updated: Electron 42, Chrome 136, build number 635180
+- ``on_presence_update`` now dispatches a :class:`~cascade.entities.presence.Presence` entity (was raw dict)
+- ``on_user_update`` now dispatches :class:`~cascade.entities.user.ClientUser` (was raw dict)
+- ``on_reaction_add`` / ``on_reaction_remove`` now dispatch :class:`~cascade.entities.reaction.Reaction` (was raw dict)
+- ``on_audit_log_entry`` now dispatches :class:`~cascade.entities.audit_log.AuditLogEntry` (was raw dict)
+- ``on_ban_add`` / ``on_ban_remove`` dispatch :class:`~cascade.entities.ban.Ban`
+- ``accept-encoding`` header no longer includes ``br`` (Brotli not installed, caused 400 errors)
+- ``fetch_read_states()`` now uses READY payload cache, falls back to REST
+
+Fixed
+~~~~~
+
+- Read states REST endpoint updated to correct path
+- Duplicate ``fetch_note``/``set_note`` methods removed from session
+- ``Message.clear_reactions()`` broken import path fixed
+- Missing ``datetime`` import in ``message.py``
+
+----
+
 v0.3.1
 ------
 
