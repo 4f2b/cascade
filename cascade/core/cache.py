@@ -34,6 +34,7 @@ class Cache:
         self.channels: Dict[str, Any] = {}
         self.users: Dict[str, Any] = {}
         self.members: Dict[str, Dict[str, Any]] = {}
+        self._read_states: Dict[str, Any] = {}
 
     def get_guild(self, guild_id: str) -> Optional[Any]:
         return self.guilds.get(guild_id)

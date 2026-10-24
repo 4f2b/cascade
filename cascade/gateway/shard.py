@@ -364,6 +364,12 @@ class GatewayShard:
                     session.cache.add_guild(Guild(g, session))
                 except Exception:
                     pass
+            for rs in data.get('read_state', {}).get('entries', []):
+                try:
+                    from ..entities.read_state import ReadState
+                    session.cache._read_states[rs['id']] = ReadState(rs, session)
+                except Exception:
+                    pass
             session._ready.set()
             session.dispatcher.dispatch('on_ready', session.user)
 
@@ -601,6 +607,9 @@ class GatewayShard:
 
         elif event == 'SESSIONS_REPLACE':
             session.dispatcher.dispatch('on_sessions_replace', data)
+
+        elif event == 'VOICE_CHANNEL_STATUS_UPDATE':
+            session.dispatcher.dispatch('on_voice_channel_status', data.get('id'), data.get('guild_id'), data.get('status'))
 
         elif event == 'WEBHOOKS_UPDATE':
             session.dispatcher.dispatch('on_webhooks_update', data.get('guild_id'), data.get('channel_id'))

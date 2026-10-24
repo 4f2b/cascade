@@ -1,5 +1,6 @@
 from typing import Optional, List, TYPE_CHECKING
 import asyncio
+from datetime import datetime
 
 if TYPE_CHECKING:
     from ..core.session import Session
@@ -41,7 +42,8 @@ class Message:
 
         self.mention_roles = data.get('mention_roles', [])
         self.mention_channels = data.get('mention_channels', [])
-        self.attachments = data.get('attachments', [])
+        from .attachment import Attachment
+        self.attachments = [Attachment(a) for a in data.get('attachments', [])]
         self.embeds = data.get('embeds', [])
         self.reactions = data.get('reactions', [])
         self.activity = data.get('activity')
@@ -114,10 +116,11 @@ class Message:
         await self._session.rest.remove_reaction(self.channel_id, self.id, emoji)
     
     async def clear_reactions(self, emoji: str = None) -> None:
+        base = f'https://discord.com/api/v10/channels/{self.channel_id}/messages/{self.id}/reactions'
         if emoji:
-            await self._session.rest.delete(f'{self._session.rest.routes.channel_message(self.channel_id, self.id)}/reactions/{emoji}')
+            await self._session.rest.delete(f'{base}/{emoji}')
         else:
-            await self._session.rest.delete(f'{self._session.rest.routes.channel_message(self.channel_id, self.id)}/reactions')
+            await self._session.rest.delete(base)
     
     async def ack(self) -> None:
         await self._session.rest.ack_message(self.channel_id, self.id)

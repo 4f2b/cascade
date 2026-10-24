@@ -218,10 +218,15 @@ class Session:
 
     async def fetch_read_states(self) -> List[Any]:
         from ..entities.read_state import ReadState
-        data = await self.rest.get_read_states()
-        if isinstance(data, dict):
-            data = data.get('entries', [])
-        return [ReadState(r, self) for r in data]
+        if self.cache._read_states:
+            return list(self.cache._read_states.values())
+        try:
+            data = await self.rest.get_read_states()
+            if isinstance(data, dict):
+                data = data.get('entries', [])
+            return [ReadState(r, self) for r in (data or [])]
+        except Exception:
+            return []
 
     async def fetch_guild_stickers(self, guild_id: int) -> List[Any]:
         from ..entities.sticker import Sticker
@@ -389,14 +394,18 @@ class Session:
         return GuildTemplate(data, self)
 
     async def fetch_user_profile(self, user_id: int, guild_id: int = None) -> Dict[str, Any]:
-        return await self.rest.get_user_profile(str(user_id), str(guild_id) if guild_id else None)
+        return await self.rest.get_user_profile_full(str(user_id), str(guild_id) if guild_id else None)
 
-    async def set_note(self, user_id: int, note: str) -> None:
-        await self.rest.set_user_note(str(user_id), note)
-
-    async def fetch_note(self, user_id: int) -> str:
+    async def fetch_note(self, user_id: int) -> Any:
+        from ..entities.note import Note
         data = await self.rest.get_user_notes(str(user_id))
-        return data.get('note', '') if isinstance(data, dict) else ''
+        content = data.get('note', '') if isinstance(data, dict) else ''
+        return Note(str(user_id), content, self)
+
+    async def set_note(self, user_id: int, content: str) -> Any:
+        from ..entities.note import Note
+        await self.rest.set_user_note(str(user_id), content)
+        return Note(str(user_id), content, self)
 
     async def fetch_messages(self, channel_id: int, limit: int = 50, **kwargs) -> List[Any]:
         from ..entities.message import Message
@@ -408,10 +417,66 @@ class Session:
         data = await self.rest.get_message(str(channel_id), str(message_id))
         return Message(data, self)
 
-    async def send_message(self, channel_id: int, content: str = None, **kwargs) -> Any:
+    async def send_message(self, channel_id: int, content=None, **kwargs) -> Any:
         from ..entities.message import Message
         data = await self.rest.send_message(str(channel_id), content, **kwargs)
         return Message(data, self)
 
     async def ack_message(self, channel_id: int, message_id: int) -> None:
         await self.rest.ack_message(str(channel_id), str(message_id))
+
+    async def fetch_pinned_messages(self, channel_id: int) -> List[Any]:
+        from ..entities.message import Message
+        data = await self.rest.get_pinned_messages(str(channel_id))
+        return [Message(m, self) for m in data]
+
+    async def search_messages(self, query: str, *, channel_id: int = None, guild_id: int = None, **kwargs) -> Any:
+        from ..entities.search_result import MessageSearchResult
+        if guild_id:
+            data = await self.rest.search_guild_messages(str(guild_id), query, **kwargs)
+        elif channel_id:
+            data = await self.rest.search_channel_messages(str(channel_id), query, **kwargs)
+        else:
+            raise ValueError('Provide either channel_id or guild_id')
+        return MessageSearchResult(data, self)
+
+    async def fetch_guild_preview(self, guild_id: int) -> Any:
+        from ..entities.guild_preview import GuildPreview
+        data = await self.rest.get_guild_preview(str(guild_id))
+        return GuildPreview(data)
+
+    async def fetch_integrations(self, guild_id: int) -> List[Any]:
+        from ..entities.integration import Integration
+        data = await self.rest.get_guild_integrations(str(guild_id))
+        return [Integration(i, self, str(guild_id)) for i in data]
+
+    async def fetch_voice_regions(self) -> List[Any]:
+        from ..entities.voice_region import VoiceRegion
+        data = await self.rest.get_voice_regions()
+        return [VoiceRegion(r) for r in data]
+
+    async def fetch_guild_voice_regions(self, guild_id: int) -> List[Any]:
+        from ..entities.voice_region import VoiceRegion
+        data = await self.rest.get_guild_voice_regions(str(guild_id))
+        return [VoiceRegion(r) for r in data]
+
+    async def set_voice_channel_status(self, channel_id: int, status: str) -> None:
+        await self.rest.set_voice_channel_status(str(channel_id), status)
+
+    async def fetch_forum_posts(self, channel_id: int, archived: bool = False, limit: int = 50) -> List[Any]:
+        from ..entities.forum import ForumPost
+        if archived:
+            data = await self.rest.list_public_archived_threads(str(channel_id), limit=limit)
+        else:
+            ch = await self.rest.get_channel(str(channel_id))
+            guild_id = ch.get('guild_id', '')
+            data = await self.rest.list_active_threads(guild_id)
+        threads = data if isinstance(data, list) else data.get('threads', [])
+        return [ForumPost(t, self) for t in threads if t.get('parent_id') == str(channel_id)]
+
+    @property
+    def quests(self):
+        from ..quests.client import QuestClient
+        if not hasattr(self, '_quest_client') or self._quest_client is None:
+            self._quest_client = QuestClient(self)
+        return self._quest_client

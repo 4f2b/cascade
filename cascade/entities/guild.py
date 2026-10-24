@@ -119,6 +119,65 @@ class Guild:
         data = await self._session.rest.get_guild_member(self.id, str(user_id))
         return Member(data, self._session, self.id)
 
+    async def fetch_bans(self, limit: int = 1000) -> list:
+        from .ban import Ban
+        data = await self._session.rest.get_guild_bans(self.id, limit=limit)
+        return [Ban(b, self.id) for b in data]
+
+    async def fetch_ban(self, user_id: int):
+        from .ban import Ban
+        data = await self._session.rest.get_guild_ban(self.id, str(user_id))
+        return Ban(data, self.id)
+
+    async def fetch_audit_log(self, **kwargs):
+        from .audit_log import AuditLog
+        data = await self._session.rest.get_guild_audit_log(self.id, **kwargs)
+        return AuditLog(data, self.id)
+
+    async def fetch_templates(self) -> list:
+        from .template import GuildTemplate
+        data = await self._session.rest.get_guild_templates(self.id)
+        return [GuildTemplate(t, self._session) for t in data]
+
+    async def fetch_onboarding(self):
+        from .onboarding import GuildOnboarding
+        data = await self._session.rest.get_guild_onboarding(self.id)
+        return GuildOnboarding(data, self._session)
+
+    async def fetch_welcome_screen(self):
+        from .onboarding import WelcomeScreen
+        data = await self._session.rest.get_guild_welcome_screen(self.id)
+        return WelcomeScreen(data, self._session, self.id)
+
+    async def fetch_scheduled_events(self) -> list:
+        from .scheduled_event import ScheduledEvent
+        data = await self._session.rest.get_guild_scheduled_events(self.id)
+        return [ScheduledEvent(e, self._session) for e in data]
+
+    async def fetch_invites(self) -> list:
+        return await self._session.rest.get_guild_invites(self.id)
+
+    async def fetch_webhooks(self) -> list:
+        return await self._session.rest.get_guild_webhooks(self.id)
+
+    async def fetch_stickers(self) -> list:
+        from .sticker import Sticker
+        data = await self._session.rest.get_guild_stickers(self.id)
+        return [Sticker(s, self._session) for s in data]
+
+    async def fetch_emojis(self) -> list:
+        return await self._session.rest.get_guild_emojis(self.id)
+
+    async def fetch_roles(self) -> list:
+        from .role import Role
+        data = await self._session.rest.get_guild_roles(self.id)
+        return [Role(r) for r in data]
+
+    async def edit(self, **kwargs):
+        data = await self._session.rest.edit_guild(self.id, **kwargs)
+        self._update(data)
+        return self
+
     def __str__(self) -> str:
         return self.name
 

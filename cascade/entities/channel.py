@@ -6,7 +6,6 @@ if TYPE_CHECKING:
     from .message import Message
     from .user import User
 
-
 class Channel:
     def __init__(self, data: dict, session: 'Session'):
         self._session = session
@@ -195,7 +194,7 @@ class GroupChannel(Channel):
 
 def create_channel(data: dict, session: 'Session') -> Optional[Channel]:
     channel_type = ChannelType(data['type'])
-    
+
     if channel_type == ChannelType.GUILD_TEXT:
         return TextChannel(data, session)
     elif channel_type == ChannelType.DM:
@@ -208,5 +207,16 @@ def create_channel(data: dict, session: 'Session') -> Optional[Channel]:
         return CategoryChannel(data, session)
     elif channel_type == ChannelType.GUILD_NEWS:
         return TextChannel(data, session)
+    elif channel_type == ChannelType.GUILD_FORUM:
+        from .forum import ForumChannel
+        return ForumChannel(data, session)
+    elif channel_type in (
+        ChannelType.GUILD_PUBLIC_THREAD,
+        ChannelType.GUILD_PRIVATE_THREAD,
+        ChannelType.GUILD_NEWS_THREAD,
+    ):
+        return TextChannel(data, session)
+    elif channel_type == ChannelType.GUILD_STAGE_VOICE:
+        return VoiceChannel(data, session)
     else:
         return Channel(data, session)

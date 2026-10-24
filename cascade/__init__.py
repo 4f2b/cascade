@@ -15,6 +15,18 @@ from .entities.audit_log import AuditLog, AuditLogEntry, AuditLogChange
 from .entities.reaction import Reaction, ReactionEmoji
 from .entities.ban import Ban
 from .entities.template import GuildTemplate
+from .entities.attachment import Attachment
+from .entities.forum import ForumChannel, ForumPost, ForumTag
+from .entities.note import Note
+from .entities.integration import Integration, IntegrationAccount, IntegrationApplication
+from .entities.guild_preview import GuildPreview
+from .entities.voice_region import VoiceRegion
+from .entities.search_result import MessageSearchResult
+from .quests import (
+    Quest, QuestConfig, QuestUserStatus, QuestTaskProgress, QuestReward,
+    QuestTaskHeartbeat, ClaimedQuest, QuestClient,
+    QuestTaskType, QuestRewardType, QuestRewardAssignmentMethod, QuestPlatform, QuestContentType,
+)
 from .entities.message import Message
 from .entities.user import User, ClientUser
 from .entities.guild import Guild
@@ -47,6 +59,7 @@ from .utils.color import Color
 from .utils.validator import is_valid_username, extract_invite_code, parse_message_link
 from .utils.markdown import MarkdownProcessor, bold, italic, underline, strikethrough, code, code_block, spoiler
 from .utils.embed import Embed
+from .utils.message_builder import MessageBuilder, AllowedMentions
 from .utils.activity_builder import RichActivity, ActivityAssets, ActivityTimestamps, ActivityParty, ActivitySecrets, ActivityButton
 from .ext.commands import Bot, Context, command
 from .voice import VoiceState, VoiceClient, AudioSource, PCMAudio, FFmpegAudio, OpusEncoder
@@ -80,6 +93,30 @@ __all__ = (
     'ReactionEmoji',
     'Ban',
     'GuildTemplate',
+    'Attachment',
+    'ForumChannel',
+    'ForumPost',
+    'ForumTag',
+    'Note',
+    'Integration',
+    'IntegrationAccount',
+    'IntegrationApplication',
+    'GuildPreview',
+    'VoiceRegion',
+    'MessageSearchResult',
+    'Quest',
+    'QuestConfig',
+    'QuestUserStatus',
+    'QuestTaskProgress',
+    'QuestReward',
+    'QuestTaskHeartbeat',
+    'ClaimedQuest',
+    'QuestClient',
+    'QuestTaskType',
+    'QuestRewardType',
+    'QuestRewardAssignmentMethod',
+    'QuestPlatform',
+    'QuestContentType',
     'Message',
     'User',
     'ClientUser',
@@ -148,6 +185,8 @@ __all__ = (
     'code_block',
     'spoiler',
     'Embed',
+    'MessageBuilder',
+    'AllowedMentions',
     'RichActivity',
     'ActivityAssets',
     'ActivityTimestamps',

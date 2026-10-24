@@ -76,3 +76,38 @@ class Member:
 
     def __hash__(self) -> int:
         return hash((self.id, self.guild_id))
+
+    async def edit(self, **kwargs) -> 'Member':
+        data = await self._session.rest.edit_guild_member(self.guild_id, self.id, **kwargs)
+        if data:
+            self._update(data)
+        return self
+
+    async def set_nickname(self, nick: str = None) -> 'Member':
+        return await self.edit(nick=nick)
+
+    async def add_role(self, role_id: str) -> None:
+        await self._session.rest.add_guild_member_role(self.guild_id, self.id, role_id)
+
+    async def remove_role(self, role_id: str) -> None:
+        await self._session.rest.remove_guild_member_role(self.guild_id, self.id, role_id)
+
+    async def kick(self) -> None:
+        await self._session.rest.kick_guild_member(self.guild_id, self.id)
+
+    async def ban(self, delete_message_days: int = 0) -> None:
+        await self._session.rest.ban_guild_member(self.guild_id, self.id, delete_message_days)
+
+    async def timeout(self, until: str) -> 'Member':
+        return await self.edit(communication_disabled_until=until)
+
+    async def remove_timeout(self) -> 'Member':
+        return await self.edit(communication_disabled_until=None)
+
+    async def send(self, content: str = None, **kwargs):
+        if self.user:
+            return await self.user.send(content, **kwargs)
+        raise RuntimeError('No user data on this member')
+
+    async def fetch_profile(self) -> dict:
+        return await self._session.rest.get_user_profile(self.id, guild_id=self.guild_id)

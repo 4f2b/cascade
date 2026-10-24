@@ -25,29 +25,30 @@ class RestClient:
     def _build_super_properties(self) -> str:
         if self.spoofer:
             return self.spoofer.get_super_properties()
-        
+
         props = {
             'os': 'Windows',
-            'browser': 'Chrome',
+            'browser': 'Discord Client',
             'device': '',
             'system_locale': 'en-US',
             'browser_user_agent': self._get_user_agent(),
-            'browser_version': '131.0.0.0',
-            'os_version': '10',
+            'browser_version': '1.0.9262',
+            'os_version': '10.0.22631',
             'referrer': '',
             'referring_domain': '',
             'referrer_current': '',
             'referring_domain_current': '',
             'release_channel': 'stable',
-            'client_build_number': 331288,
+            'client_build_number': 635180,
             'client_event_source': None,
+            'has_client_mods': False,
         }
         return base64.b64encode(json.dumps(props, separators=(',', ':')).encode()).decode()
 
     def _get_user_agent(self) -> str:
         if self.spoofer:
             return self.spoofer.get_user_agent()
-        return 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
+        return 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) discord/1.0.9262 Chrome/136.0.0.0 Electron/42.0.0 Safari/537.36'
 
     def _build_headers(self) -> Dict[str, str]:
         return {
@@ -60,7 +61,7 @@ class RestClient:
             'Accept-Encoding': 'gzip, deflate',
             'Referer': 'https://discord.com/channels/@me',
             'Origin': 'https://discord.com',
-            'Sec-Ch-Ua': '"Chromium";v="131", "Not_A Brand";v="24"',
+            'Sec-Ch-Ua': '"Chromium";v="136", "Not_A Brand";v="24", "Google Chrome";v="136"',
             'Sec-Ch-Ua-Mobile': '?0',
             'Sec-Ch-Ua-Platform': '"Windows"',
             'Sec-Fetch-Dest': 'empty',
@@ -166,10 +167,14 @@ class RestClient:
         return await self.request('DELETE', route, **kwargs)
 
     async def send_message(self, channel_id: str, content: str = None, **kwargs) -> Dict[str, Any]:
-        payload = {}
-        if content:
-            payload['content'] = content
-        payload.update(kwargs)
+        from ..utils.message_builder import MessageBuilder
+        if isinstance(content, MessageBuilder):
+            payload = content.build()
+        else:
+            payload = {}
+            if content:
+                payload['content'] = content
+            payload.update(kwargs)
         return await self.post(routes.channel_messages(channel_id), json=payload)
 
     async def edit_message(self, channel_id: str, message_id: str, content: str = None, **kwargs) -> Dict[str, Any]:
@@ -1080,7 +1085,10 @@ class RestClient:
         return await self.post(f'{BASE}/channels/{channel_id}/polls/{message_id}/expire', json={})
 
     async def get_read_states(self) -> List[Dict[str, Any]]:
-        return await self.get(f'{BASE}/users/@me/read-state')
+        data = await self.get(f'{BASE}/users/@me/read-states')
+        if isinstance(data, dict):
+            return data.get('entries', [])
+        return data or []
 
     async def ack_channel(self, channel_id: int) -> None:
         await self.post(f'{BASE}/channels/{channel_id}/messages/ack', json={'token': None})
@@ -1204,3 +1212,187 @@ class RestClient:
 
     async def get_guild_affinities(self) -> dict:
         return await self.get(f'{BASE}/users/@me/affinities/guilds')
+
+    async def create_forum_post(self, channel_id: str, payload: dict) -> dict:
+        return await self.post(f'{BASE}/channels/{channel_id}/threads', json=payload)
+
+    async def set_voice_channel_status(self, channel_id: str, status: str) -> None:
+        await self.put(f'{BASE}/channels/{channel_id}/voice-status', json={'status': status})
+
+    async def search_guild_messages(self, guild_id: str, query: str, **kwargs) -> dict:
+        params = {'content': query}
+        params.update(kwargs)
+        return await self.get(f'{BASE}/guilds/{guild_id}/messages/search', params=params)
+
+    async def search_channel_messages(self, channel_id: str, query: str, **kwargs) -> dict:
+        params = {'content': query}
+        params.update(kwargs)
+        return await self.get(f'{BASE}/channels/{channel_id}/messages/search', params=params)
+
+    async def get_guild_discovery_requirements(self, guild_id: str) -> dict:
+        return await self.get(f'{BASE}/guilds/{guild_id}/discovery-requirements')
+
+    async def get_channel_permissions(self, channel_id: str) -> list:
+        return await self.get(f'{BASE}/channels/{channel_id}/permissions')
+
+    async def edit_channel_permission(self, channel_id: str, overwrite_id: str, **kwargs) -> None:
+        await self.put(f'{BASE}/channels/{channel_id}/permissions/{overwrite_id}', json=kwargs)
+
+    async def delete_channel_permission(self, channel_id: str, overwrite_id: str) -> None:
+        await self.delete(f'{BASE}/channels/{channel_id}/permissions/{overwrite_id}')
+
+    async def get_guild_member_verification(self, guild_id: str) -> dict:
+        return await self.get(f'{BASE}/guilds/{guild_id}/member-verification')
+
+    async def agree_guild_rules(self, guild_id: str, form_fields: list, version: str) -> dict:
+        return await self.put(
+            f'{BASE}/guilds/{guild_id}/requests/@me',
+            json={'form_fields': form_fields, 'version': version},
+        )
+
+    async def get_guild_application_commands(self, guild_id: str, application_id: str) -> list:
+        return await self.get(f'{BASE}/guilds/{guild_id}/application-command-index')
+
+    async def suppress_embeds(self, channel_id: str, message_id: str, suppress: bool = True) -> dict:
+        flags = 4 if suppress else 0
+        return await self.patch(f'{BASE}/channels/{channel_id}/messages/{message_id}', json={'flags': flags})
+
+    async def crosspost_message(self, channel_id: str, message_id: str) -> dict:
+        return await self.post(f'{BASE}/channels/{channel_id}/messages/{message_id}/crosspost')
+
+    async def pin_message(self, channel_id: str, message_id: str) -> None:
+        await self.put(f'{BASE}/channels/{channel_id}/pins/{message_id}')
+
+    async def unpin_message(self, channel_id: str, message_id: str) -> None:
+        await self.delete(f'{BASE}/channels/{channel_id}/pins/{message_id}')
+
+    async def get_pinned_messages(self, channel_id: str) -> list:
+        return await self.get(f'{BASE}/channels/{channel_id}/pins')
+
+    async def bulk_ban_members(self, guild_id: str, user_ids: List[str], delete_message_seconds: int = 86400) -> Dict[str, Any]:
+        return await self.post(f'{BASE}/guilds/{guild_id}/bulk-ban', json={
+            'user_ids': user_ids,
+            'delete_message_seconds': delete_message_seconds,
+        })
+
+    async def get_recent_mentions(self, limit: int = 25, before: str = None, guild_id: str = None, roles: bool = True, everyone: bool = True) -> List[Dict[str, Any]]:
+        params: Dict[str, Any] = {'limit': limit, 'roles': str(roles).lower(), 'everyone': str(everyone).lower()}
+        if before:
+            params['before'] = before
+        if guild_id:
+            params['guild_id'] = guild_id
+        return await self.get(f'{BASE}/users/@me/mentions', params=params)
+
+    async def delete_recent_mention(self, message_id: str) -> None:
+        await self.delete(f'{BASE}/users/@me/mentions/{message_id}')
+
+    async def get_all_notes(self) -> Dict[str, str]:
+        return await self.get(f'{BASE}/users/@me/notes')
+
+    async def change_hypesquad_house(self, house_id: int) -> None:
+        await self.post(f'{BASE}/hypesquad/online', json={'house_id': house_id})
+
+    async def leave_hypesquad_house(self) -> None:
+        await self.delete(f'{BASE}/hypesquad/online')
+
+    async def get_user_profile_full(self, user_id: str, guild_id: str = None, with_mutual_guilds: bool = True, with_mutual_friends: bool = False, with_mutual_friends_count: bool = False) -> Dict[str, Any]:
+        params: Dict[str, Any] = {
+            'with_mutual_guilds': str(with_mutual_guilds).lower(),
+            'with_mutual_friends': str(with_mutual_friends).lower(),
+            'with_mutual_friends_count': str(with_mutual_friends_count).lower(),
+        }
+        if guild_id:
+            params['guild_id'] = guild_id
+        return await self.get(f'{BASE}/users/{user_id}/profile', params=params)
+
+    async def get_mutual_friends(self, user_id: str) -> List[Dict[str, Any]]:
+        return await self.get(f'{BASE}/users/{user_id}/relationships')
+
+    async def set_relationship_nickname(self, user_id: str, nickname: str) -> None:
+        await self.patch(f'{BASE}/users/@me/relationships/{user_id}', json={'nickname': nickname})
+
+    async def accept_friend_request(self, user_id: str) -> None:
+        await self.put(f'{BASE}/users/@me/relationships/{user_id}', json={})
+
+    async def get_proto_settings(self, type: int) -> Dict[str, Any]:
+        return await self.get(f'{BASE}/users/@me/settings-proto/{type}')
+
+    async def edit_proto_settings(self, type: int, settings: str, required_data_version: int = None) -> Dict[str, Any]:
+        payload: Dict[str, Any] = {'settings': settings}
+        if required_data_version is not None:
+            payload['required_data_version'] = required_data_version
+        return await self.patch(f'{BASE}/users/@me/settings-proto/{type}', json=payload)
+
+    async def get_recent_avatars(self) -> List[Dict[str, Any]]:
+        data = await self.get(f'{BASE}/users/@me/avatars')
+        if isinstance(data, dict):
+            return data.get('avatars', [])
+        return data or []
+
+    async def delete_recent_avatar(self, avatar_id: str) -> None:
+        await self.delete(f'{BASE}/users/@me/avatars/{avatar_id}')
+
+    async def accept_message_request(self, channel_id: str) -> Dict[str, Any]:
+        return await self.put(f'{BASE}/channels/{channel_id}/recipients/@me', json={'consent_status': 2})
+
+    async def decline_message_request(self, channel_id: str) -> None:
+        await self.delete(f'{BASE}/channels/{channel_id}/recipients/@me')
+
+    async def mark_message_request(self, channel_id: str) -> Dict[str, Any]:
+        return await self.put(f'{BASE}/channels/{channel_id}/recipients/@me', json={'consent_status': 1})
+
+    async def send_greet(self, channel_id: str, sticker_id: str, message_id: str = None) -> Dict[str, Any]:
+        payload: Dict[str, Any] = {'sticker_ids': [sticker_id]}
+        if message_id:
+            payload['message_reference'] = {'message_id': message_id}
+        return await self.post(f'{BASE}/channels/{channel_id}/greet', json=payload)
+
+    async def get_channel_affinities(self) -> Dict[str, Any]:
+        return await self.get(f'{BASE}/users/@me/affinities/channels')
+
+    async def get_guild_member_verification(self, guild_id: str, with_guild: bool = False, invite_code: str = None) -> Dict[str, Any]:
+        params: Dict[str, Any] = {'with_guild': str(with_guild).lower()}
+        if invite_code:
+            params['invite_code'] = invite_code
+        return await self.get(f'{BASE}/guilds/{guild_id}/member-verification', params=params)
+
+    async def submit_guild_join_request(self, guild_id: str, form_fields: List[Dict], version: str = None) -> Dict[str, Any]:
+        payload: Dict[str, Any] = {'form_fields': form_fields}
+        if version:
+            payload['version'] = version
+        return await self.put(f'{BASE}/guilds/{guild_id}/requests/@me', json=payload)
+
+    async def get_own_join_request(self, guild_id: str) -> Dict[str, Any]:
+        return await self.get(f'{BASE}/guilds/{guild_id}/requests/@me')
+
+    async def delete_join_request(self, guild_id: str) -> None:
+        await self.delete(f'{BASE}/guilds/{guild_id}/requests/@me')
+
+    async def get_join_request_cooldown(self, guild_id: str) -> Dict[str, Any]:
+        return await self.get(f'{BASE}/guilds/{guild_id}/requests/@me/cooldown')
+
+    async def get_guild_join_requests(self, guild_id: str, status: str, limit: int = 100, before: str = None, after: str = None) -> Dict[str, Any]:
+        params: Dict[str, Any] = {'status': status, 'limit': limit}
+        if before:
+            params['before'] = before
+        if after:
+            params['after'] = after
+        return await self.get(f'{BASE}/guilds/{guild_id}/requests', params=params)
+
+    async def get_premium_usage(self) -> Dict[str, Any]:
+        return await self.get(f'{BASE}/users/@me/premium-usage')
+
+    async def get_country_code(self) -> Dict[str, Any]:
+        return await self.get(f'{BASE}/users/@me/billing/country-code')
+
+    async def get_guild_profile(self, guild_id: str) -> Dict[str, Any]:
+        return await self.get(f'{BASE}/guilds/{guild_id}/profile')
+
+    async def edit_guild_profile(self, guild_id: str, **kwargs) -> Dict[str, Any]:
+        return await self.patch(f'{BASE}/guilds/{guild_id}/profile', json=kwargs)
+
+    async def get_user_top_read_channels(self, guild_id: str) -> List[str]:
+        return await self.get(f'{BASE}/guilds/{guild_id}/top-read-channels')
+
+    async def get_detectable_applications(self) -> List[Dict[str, Any]]:
+        return await self.get(f'{BASE}/applications/detectable')
